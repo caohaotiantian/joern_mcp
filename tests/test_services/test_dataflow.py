@@ -1,4 +1,5 @@
 """测试数据流分析服务"""
+
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 from joern_mcp.services.dataflow import DataFlowService
@@ -8,19 +9,21 @@ from joern_mcp.services.dataflow import DataFlowService
 async def test_track_dataflow():
     """测试追踪数据流"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": True,
-        "stdout": '''[{
+    mock_executor.execute = AsyncMock(
+        return_value={
+            "success": True,
+            "stdout": """[{
             "source": {"code": "gets(buf)", "method": "main", "file": "main.c", "line": 10},
             "sink": {"code": "system(cmd)", "method": "exec", "file": "utils.c", "line": 20},
             "pathLength": 5,
             "path": []
-        }]'''
-    })
-    
+        }]""",
+        }
+    )
+
     service = DataFlowService(mock_executor)
     result = await service.track_dataflow("gets", "system")
-    
+
     assert result["success"] is True
     assert result["source_method"] == "gets"
     assert result["sink_method"] == "system"
@@ -32,19 +35,21 @@ async def test_track_dataflow():
 async def test_analyze_variable_flow():
     """测试分析变量流"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": True,
-        "stdout": '''[{
+    mock_executor.execute = AsyncMock(
+        return_value={
+            "success": True,
+            "stdout": """[{
             "variable": "user_input",
             "source": {"code": "user_input", "file": "main.c", "line": 5},
             "sink": {"code": "system(user_input)", "method": "system", "file": "main.c", "line": 10},
             "pathLength": 3
-        }]'''
-    })
-    
+        }]""",
+        }
+    )
+
     service = DataFlowService(mock_executor)
     result = await service.analyze_variable_flow("user_input", "system")
-    
+
     assert result["success"] is True
     assert result["variable"] == "user_input"
     assert result["sink_method"] == "system"
@@ -55,21 +60,23 @@ async def test_analyze_variable_flow():
 async def test_analyze_variable_flow_no_sink():
     """测试分析变量流（无特定汇）"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": True,
-        "stdout": '''[{
+    mock_executor.execute = AsyncMock(
+        return_value={
+            "success": True,
+            "stdout": """[{
             "variable": "buf",
             "code": "buf",
             "type": "char[]",
             "method": "main",
             "file": "main.c",
             "line": 10
-        }]'''
-    })
-    
+        }]""",
+        }
+    )
+
     service = DataFlowService(mock_executor)
     result = await service.analyze_variable_flow("buf")
-    
+
     assert result["success"] is True
     assert result["variable"] == "buf"
     assert result["sink_method"] is None
@@ -80,9 +87,10 @@ async def test_analyze_variable_flow_no_sink():
 async def test_find_data_dependencies():
     """测试查找数据依赖"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": True,
-        "stdout": '''[{
+    mock_executor.execute = AsyncMock(
+        return_value={
+            "success": True,
+            "stdout": """[{
             "variable": "x",
             "code": "x",
             "type": "int",
@@ -94,12 +102,13 @@ async def test_find_data_dependencies():
             "type": "int",
             "file": "main.c",
             "line": 6
-        }]'''
-    })
-    
+        }]""",
+        }
+    )
+
     service = DataFlowService(mock_executor)
     result = await service.find_data_dependencies("compute")
-    
+
     assert result["success"] is True
     assert result["function"] == "compute"
     assert len(result["dependencies"]) >= 2
@@ -109,21 +118,23 @@ async def test_find_data_dependencies():
 async def test_find_data_dependencies_specific_variable():
     """测试查找特定变量的依赖"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": True,
-        "stdout": '''[{
+    mock_executor.execute = AsyncMock(
+        return_value={
+            "success": True,
+            "stdout": """[{
             "variable": "buf",
             "code": "buf",
             "method": "main",
             "file": "main.c",
             "line": 10,
             "type": "char[]"
-        }]'''
-    })
-    
+        }]""",
+        }
+    )
+
     service = DataFlowService(mock_executor)
     result = await service.find_data_dependencies("main", "buf")
-    
+
     assert result["success"] is True
     assert result["function"] == "main"
     assert result["variable"] == "buf"
@@ -134,14 +145,11 @@ async def test_find_data_dependencies_specific_variable():
 async def test_track_dataflow_no_results():
     """测试无数据流结果"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": True,
-        "stdout": "[]"
-    })
-    
+    mock_executor.execute = AsyncMock(return_value={"success": True, "stdout": "[]"})
+
     service = DataFlowService(mock_executor)
     result = await service.track_dataflow("source", "sink")
-    
+
     assert result["success"] is True
     assert result["count"] == 0
     assert len(result["flows"]) == 0
@@ -151,14 +159,12 @@ async def test_track_dataflow_no_results():
 async def test_track_dataflow_query_failed():
     """测试查询失败"""
     mock_executor = MagicMock()
-    mock_executor.execute = AsyncMock(return_value={
-        "success": False,
-        "stderr": "Query error"
-    })
-    
+    mock_executor.execute = AsyncMock(
+        return_value={"success": False, "stderr": "Query error"}
+    )
+
     service = DataFlowService(mock_executor)
     result = await service.track_dataflow("source", "sink")
-    
+
     assert result["success"] is False
     assert "error" in result
-

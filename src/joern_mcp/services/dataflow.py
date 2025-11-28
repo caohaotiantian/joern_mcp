@@ -1,4 +1,5 @@
 """数据流分析服务"""
+
 import json
 from typing import Dict, Optional, List
 from loguru import logger
@@ -8,29 +9,26 @@ from joern_mcp.joern.templates import QueryTemplates
 
 class DataFlowService:
     """数据流分析服务"""
-    
+
     def __init__(self, query_executor: QueryExecutor):
         self.executor = query_executor
-    
+
     async def track_dataflow(
-        self,
-        source_method: str,
-        sink_method: str,
-        max_flows: int = 10
+        self, source_method: str, sink_method: str, max_flows: int = 10
     ) -> Dict:
         """
         追踪从源方法到汇方法的数据流
-        
+
         Args:
             source_method: 源方法名称
             sink_method: 汇方法名称
             max_flows: 最大流数量
-            
+
         Returns:
             dict: 数据流信息
         """
         logger.info(f"Tracking dataflow from {source_method} to {sink_method}")
-        
+
         try:
             query = f'''
             def source = cpg.method.name("{source_method}").parameter
@@ -57,9 +55,9 @@ class DataFlowService:
                 ))
             ))
             '''
-            
+
             result = await self.executor.execute(query)
-            
+
             if result.get("success"):
                 stdout = result.get("stdout", "")
                 try:
@@ -68,48 +66,45 @@ class DataFlowService:
                         "success": True,
                         "source_method": source_method,
                         "sink_method": sink_method,
-                        "flows": flows if isinstance(flows, list) else [flows] if flows else [],
-                        "count": len(flows) if isinstance(flows, list) else (1 if flows else 0)
+                        "flows": flows
+                        if isinstance(flows, list)
+                        else [flows]
+                        if flows
+                        else [],
+                        "count": len(flows)
+                        if isinstance(flows, list)
+                        else (1 if flows else 0),
                     }
                 except json.JSONDecodeError:
                     return {
                         "success": True,
                         "source_method": source_method,
                         "sink_method": sink_method,
-                        "raw_output": stdout
+                        "raw_output": stdout,
                     }
             else:
-                return {
-                    "success": False,
-                    "error": result.get("stderr", "Query failed")
-                }
-                
+                return {"success": False, "error": result.get("stderr", "Query failed")}
+
         except Exception as e:
             logger.exception(f"Error tracking dataflow: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
+            return {"success": False, "error": str(e)}
+
     async def analyze_variable_flow(
-        self,
-        variable_name: str,
-        sink_method: Optional[str] = None,
-        max_flows: int = 10
+        self, variable_name: str, sink_method: Optional[str] = None, max_flows: int = 10
     ) -> Dict:
         """
         分析变量的数据流
-        
+
         Args:
             variable_name: 变量名称
             sink_method: 目标汇方法（可选）
             max_flows: 最大流数量
-            
+
         Returns:
             dict: 变量流信息
         """
         logger.info(f"Analyzing variable flow: {variable_name}")
-        
+
         try:
             if sink_method:
                 # 追踪到特定汇
@@ -147,9 +142,9 @@ class DataFlowService:
                        "line" -> i.lineNumber.getOrElse(-1)
                    ))
                 '''
-            
+
             result = await self.executor.execute(query)
-            
+
             if result.get("success"):
                 stdout = result.get("stdout", "")
                 try:
@@ -158,45 +153,43 @@ class DataFlowService:
                         "success": True,
                         "variable": variable_name,
                         "sink_method": sink_method,
-                        "flows": flows if isinstance(flows, list) else [flows] if flows else [],
-                        "count": len(flows) if isinstance(flows, list) else (1 if flows else 0)
+                        "flows": flows
+                        if isinstance(flows, list)
+                        else [flows]
+                        if flows
+                        else [],
+                        "count": len(flows)
+                        if isinstance(flows, list)
+                        else (1 if flows else 0),
                     }
                 except json.JSONDecodeError:
                     return {
                         "success": True,
                         "variable": variable_name,
-                        "raw_output": stdout
+                        "raw_output": stdout,
                     }
             else:
-                return {
-                    "success": False,
-                    "error": result.get("stderr", "Query failed")
-                }
-                
+                return {"success": False, "error": result.get("stderr", "Query failed")}
+
         except Exception as e:
             logger.exception(f"Error analyzing variable flow: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
+            return {"success": False, "error": str(e)}
+
     async def find_data_dependencies(
-        self,
-        function_name: str,
-        variable_name: Optional[str] = None
+        self, function_name: str, variable_name: Optional[str] = None
     ) -> Dict:
         """
         查找函数中的数据依赖关系
-        
+
         Args:
             function_name: 函数名称
             variable_name: 变量名称（可选，如果指定则只查找该变量）
-            
+
         Returns:
             dict: 数据依赖信息
         """
         logger.info(f"Finding data dependencies in function: {function_name}")
-        
+
         try:
             if variable_name:
                 query = f'''
@@ -225,9 +218,9 @@ class DataFlowService:
                        "line" -> i.lineNumber.getOrElse(-1)
                    ))
                 '''
-            
+
             result = await self.executor.execute(query)
-            
+
             if result.get("success"):
                 stdout = result.get("stdout", "")
                 try:
@@ -236,25 +229,24 @@ class DataFlowService:
                         "success": True,
                         "function": function_name,
                         "variable": variable_name,
-                        "dependencies": dependencies if isinstance(dependencies, list) else [dependencies] if dependencies else [],
-                        "count": len(dependencies) if isinstance(dependencies, list) else (1 if dependencies else 0)
+                        "dependencies": dependencies
+                        if isinstance(dependencies, list)
+                        else [dependencies]
+                        if dependencies
+                        else [],
+                        "count": len(dependencies)
+                        if isinstance(dependencies, list)
+                        else (1 if dependencies else 0),
                     }
                 except json.JSONDecodeError:
                     return {
                         "success": True,
                         "function": function_name,
-                        "raw_output": stdout
+                        "raw_output": stdout,
                     }
             else:
-                return {
-                    "success": False,
-                    "error": result.get("stderr", "Query failed")
-                }
-                
+                return {"success": False, "error": result.get("stderr", "Query failed")}
+
         except Exception as e:
             logger.exception(f"Error finding data dependencies: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
+            return {"success": False, "error": str(e)}

@@ -1,24 +1,22 @@
 """控制流分析MCP工具"""
+
 from typing import Optional
 from loguru import logger
-from joern_mcp.mcp_server import mcp, ServerState
+from joern_mcp.mcp_server import mcp, server_state
 
 
 @mcp.tool()
-async def get_control_flow_graph(
-    function_name: str,
-    format: str = "dot"
-) -> dict:
+async def get_control_flow_graph(function_name: str, format: str = "dot") -> dict:
     """
     获取函数的控制流图（CFG）
-    
+
     Args:
         function_name: 函数名称
         format: 输出格式 ("dot", "json")
-    
+
     Returns:
         dict: 控制流图数据
-    
+
     Example:
         >>> await get_control_flow_graph("main", format="dot")
         {
@@ -29,13 +27,10 @@ async def get_control_flow_graph(
         }
     """
     if not ServerState.query_executor:
-        return {
-            "success": False,
-            "error": "Query executor not initialized"
-        }
-    
+        return {"success": False, "error": "Query executor not initialized"}
+
     logger.info(f"Getting CFG for function: {function_name}")
-    
+
     try:
         # 构建查询
         if format == "dot":
@@ -50,47 +45,38 @@ async def get_control_flow_graph(
                    "line" -> cs.lineNumber.getOrElse(-1)
                ))
             '''
-        
+
         # 执行查询（不自动添加.toJson，因为dotCfg返回的是字符串）
         result = await ServerState.query_executor.execute(query, format="raw")
-        
+
         if result.get("success"):
             stdout = result.get("stdout", "")
             return {
                 "success": True,
                 "function": function_name,
                 "cfg": stdout,
-                "format": format
+                "format": format,
             }
         else:
-            return {
-                "success": False,
-                "error": result.get("stderr", "Query failed")
-            }
-            
+            return {"success": False, "error": result.get("stderr", "Query failed")}
+
     except Exception as e:
         logger.exception(f"Error getting CFG: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 @mcp.tool()
-async def get_dominators(
-    function_name: str,
-    format: str = "dot"
-) -> dict:
+async def get_dominators(function_name: str, format: str = "dot") -> dict:
     """
     获取函数的支配树
-    
+
     Args:
         function_name: 函数名称
         format: 输出格式 ("dot", "json")
-    
+
     Returns:
         dict: 支配树数据
-    
+
     Example:
         >>> await get_dominators("main")
         {
@@ -100,52 +86,41 @@ async def get_dominators(
         }
     """
     if not ServerState.query_executor:
-        return {
-            "success": False,
-            "error": "Query executor not initialized"
-        }
-    
+        return {"success": False, "error": "Query executor not initialized"}
+
     logger.info(f"Getting dominators for function: {function_name}")
-    
+
     try:
         query = f'cpg.method.name("{function_name}").dotDom.l'
         result = await ServerState.query_executor.execute(query, format="raw")
-        
+
         if result.get("success"):
             stdout = result.get("stdout", "")
             return {
                 "success": True,
                 "function": function_name,
                 "dominators": stdout,
-                "format": format
+                "format": format,
             }
         else:
-            return {
-                "success": False,
-                "error": result.get("stderr", "Query failed")
-            }
-            
+            return {"success": False, "error": result.get("stderr", "Query failed")}
+
     except Exception as e:
         logger.exception(f"Error getting dominators: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 @mcp.tool()
-async def analyze_control_structures(
-    function_name: str
-) -> dict:
+async def analyze_control_structures(function_name: str) -> dict:
     """
     分析函数中的控制结构
-    
+
     Args:
         function_name: 函数名称
-    
+
     Returns:
         dict: 控制结构列表
-    
+
     Example:
         >>> await analyze_control_structures("main")
         {
@@ -159,13 +134,10 @@ async def analyze_control_structures(
         }
     """
     if not ServerState.query_executor:
-        return {
-            "success": False,
-            "error": "Query executor not initialized"
-        }
-    
+        return {"success": False, "error": "Query executor not initialized"}
+
     logger.info(f"Analyzing control structures in: {function_name}")
-    
+
     try:
         query = f'''
         cpg.method.name("{function_name}")
@@ -177,36 +149,36 @@ async def analyze_control_structures(
                "file" -> cs.file.name.headOption.getOrElse("unknown")
            ))
         '''
-        
+
         result = await ServerState.query_executor.execute(query)
-        
+
         if result.get("success"):
             import json
+
             stdout = result.get("stdout", "")
             try:
                 structures = json.loads(stdout)
                 return {
                     "success": True,
                     "function": function_name,
-                    "structures": structures if isinstance(structures, list) else [structures] if structures else [],
-                    "count": len(structures) if isinstance(structures, list) else (1 if structures else 0)
+                    "structures": structures
+                    if isinstance(structures, list)
+                    else [structures]
+                    if structures
+                    else [],
+                    "count": len(structures)
+                    if isinstance(structures, list)
+                    else (1 if structures else 0),
                 }
             except json.JSONDecodeError:
                 return {
                     "success": True,
                     "function": function_name,
-                    "raw_output": stdout
+                    "raw_output": stdout,
                 }
         else:
-            return {
-                "success": False,
-                "error": result.get("stderr", "Query failed")
-            }
-            
+            return {"success": False, "error": result.get("stderr", "Query failed")}
+
     except Exception as e:
         logger.exception(f"Error analyzing control structures: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
+        return {"success": False, "error": str(e)}

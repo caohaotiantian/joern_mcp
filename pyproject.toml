@@ -116,6 +116,8 @@ markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "requires_joern: marks tests that require Joern installation",
+    "performance: marks tests as performance tests",
+    "stress: marks tests as stress tests",
 ]
 asyncio_mode = "auto"
 
@@ -158,7 +160,7 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-select = [
+lint.select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
     "F",   # pyflakes
@@ -169,18 +171,18 @@ select = [
     "ARG", # flake8-unused-arguments
     "SIM", # flake8-simplify
 ]
-ignore = [
+lint.ignore = [
     "E501",  # line too long (handled by black)
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
     "W191",  # indentation contains tabs
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["ARG", "S"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["joern_mcp"]
 
 [tool.mypy]

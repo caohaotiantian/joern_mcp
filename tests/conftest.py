@@ -1,4 +1,5 @@
 """Pytest配置和共享fixtures"""
+
 import pytest
 import asyncio
 from pathlib import Path
@@ -19,12 +20,10 @@ def tmp_project_dir(tmp_path: Path) -> Path:
     """创建临时项目目录"""
     project_dir = tmp_path / "test_project"
     project_dir.mkdir()
-    
+
     # 创建一个简单的C文件
-    (project_dir / "main.c").write_text(
-        "int main() { return 0; }"
-    )
-    
+    (project_dir / "main.c").write_text("int main() { return 0; }")
+
     return project_dir
 
 
@@ -50,7 +49,7 @@ def mock_joern_server():
     server.execute_query.return_value = {
         "success": True,
         "stdout": '["result"]',
-        "stderr": ""
+        "stderr": "",
     }
     return server
 
@@ -62,9 +61,5 @@ async def mock_async_server():
     server.start = AsyncMock()
     server.stop = AsyncMock()
     server.health_check = AsyncMock(return_value=True)
-    server.execute_query.return_value = {
-        "success": True,
-        "stdout": '["result"]'
-    }
+    server.execute_query.return_value = {"success": True, "stdout": '["result"]'}
     return server
-

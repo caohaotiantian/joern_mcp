@@ -1,4 +1,5 @@
 """分析提示模板"""
+
 from loguru import logger
 from joern_mcp.mcp_server import mcp
 
@@ -7,15 +8,15 @@ from joern_mcp.mcp_server import mcp
 async def security_audit_prompt(project_name: str = "unknown") -> str:
     """
     安全审计提示模板
-    
+
     Args:
         project_name: 项目名称
-        
+
     Returns:
         str: 提示内容
     """
     logger.info(f"Generating security audit prompt for: {project_name}")
-    
+
     return f"""# 安全审计分析
 
 你是一个专业的代码安全审计员，正在分析项目：**{project_name}**
@@ -75,15 +76,15 @@ async def security_audit_prompt(project_name: str = "unknown") -> str:
 async def code_understanding_prompt(function_name: str = "unknown") -> str:
     """
     代码理解提示模板
-    
+
     Args:
         function_name: 函数名称
-        
+
     Returns:
         str: 提示内容
     """
     logger.info(f"Generating code understanding prompt for: {function_name}")
-    
+
     return f"""# 代码理解分析
 
 你正在分析函数：**{function_name}**
@@ -161,15 +162,15 @@ await analyze_variable_flow("variable_name")
 async def refactoring_analysis_prompt(function_name: str = "unknown") -> str:
     """
     重构分析提示模板
-    
+
     Args:
         function_name: 函数名称
-        
+
     Returns:
         str: 提示内容
     """
     logger.info(f"Generating refactoring prompt for: {function_name}")
-    
+
     return f"""# 重构影响分析
 
 你正在评估重构函数：**{function_name}** 的影响
@@ -255,18 +256,22 @@ await find_vulnerabilities()
 
 
 @mcp.prompt()
-async def vulnerability_investigation_prompt(vulnerability_type: str = "Command Injection") -> str:
+async def vulnerability_investigation_prompt(
+    vulnerability_type: str = "Command Injection",
+) -> str:
     """
     漏洞调查提示模板
-    
+
     Args:
         vulnerability_type: 漏洞类型
-        
+
     Returns:
         str: 提示内容
     """
-    logger.info(f"Generating vulnerability investigation prompt for: {vulnerability_type}")
-    
+    logger.info(
+        f"Generating vulnerability investigation prompt for: {vulnerability_type}"
+    )
+
     return f"""# 漏洞深入调查
 
 你正在调查：**{vulnerability_type}** 漏洞
@@ -370,20 +375,20 @@ await export_analysis_results(
 async def batch_analysis_prompt(function_list: str = "main,init,process") -> str:
     """
     批量分析提示模板
-    
+
     Args:
         function_list: 函数列表（逗号分隔）
-        
+
     Returns:
         str: 提示内容
     """
     logger.info(f"Generating batch analysis prompt for: {function_list}")
-    
+
     functions = [f.strip() for f in function_list.split(",")]
-    
+
     return f"""# 批量代码分析
 
-你正在批量分析以下函数：**{', '.join(functions)}**
+你正在批量分析以下函数：**{", ".join(functions)}**
 
 ## 批量分析策略
 
@@ -461,4 +466,3 @@ await export_analysis_results(
 
 开始批量分析吧！
 """
-

@@ -7,4 +7,3 @@ __description__ = "Joern code analysis platform wrapped as MCP Server"
 from joern_mcp.config import settings
 
 __all__ = ["settings", "__version__"]
-

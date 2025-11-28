@@ -1,4 +1,5 @@
 """测试查询模板"""
+
 import pytest
 from joern_mcp.joern.templates import QueryTemplates
 
@@ -19,11 +20,7 @@ def test_build_callers_query():
 
 def test_build_dataflow_query():
     """测试构建数据流查询"""
-    query = QueryTemplates.build(
-        "DATAFLOW",
-        source_name="gets",
-        sink_name="system"
-    )
+    query = QueryTemplates.build("DATAFLOW", source_name="gets", sink_name="system")
     assert "gets" in query
     assert "system" in query
     assert "reachableBy" in query
@@ -35,7 +32,7 @@ def test_build_taint_analysis():
         "TAINT_ANALYSIS",
         source_pattern="get.*",
         sink_pattern="system|exec",
-        severity="HIGH"
+        severity="HIGH",
     )
     assert "get.*" in query
     assert "system|exec" in query
@@ -60,11 +57,6 @@ def test_list_templates():
 
 def test_search_pattern():
     """测试搜索模式查询"""
-    query = QueryTemplates.build(
-        "SEARCH_BY_PATTERN",
-        pattern="strcpy",
-        limit=50
-    )
+    query = QueryTemplates.build("SEARCH_BY_PATTERN", pattern="strcpy", limit=50)
     assert "strcpy" in query
     assert "take(50)" in query
-

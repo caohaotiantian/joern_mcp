@@ -1,13 +1,14 @@
 """Joern查询模板库"""
+
 from string import Template
 
 
 class QueryTemplates:
     """查询模板集合"""
-    
+
     # ===== 函数查询 =====
-    
-    GET_FUNCTION = Template('''
+
+    GET_FUNCTION = Template("""
         cpg.method.name("$name")
            .map(m => Map(
                "name" -> m.name,
@@ -17,9 +18,9 @@ class QueryTemplates:
                "lineNumberEnd" -> m.lineNumberEnd.getOrElse(-1),
                "code" -> m.code
            ))
-    ''')
-    
-    LIST_FUNCTIONS = Template('''
+    """)
+
+    LIST_FUNCTIONS = Template("""
         cpg.method
            .take($limit)
            .map(m => Map(
@@ -27,11 +28,11 @@ class QueryTemplates:
                "filename" -> m.filename,
                "lineNumber" -> m.lineNumber.getOrElse(-1)
            ))
-    ''')
-    
+    """)
+
     # ===== 调用关系查询 =====
-    
-    GET_CALLERS = Template('''
+
+    GET_CALLERS = Template("""
         cpg.method.name("$name")
            .caller
            .dedup
@@ -40,9 +41,9 @@ class QueryTemplates:
                "filename" -> m.filename,
                "lineNumber" -> m.lineNumber.getOrElse(-1)
            ))
-    ''')
-    
-    GET_CALLEES = Template('''
+    """)
+
+    GET_CALLEES = Template("""
         cpg.method.name("$name")
            .callee
            .dedup
@@ -51,9 +52,9 @@ class QueryTemplates:
                "filename" -> m.filename,
                "lineNumber" -> m.lineNumber.getOrElse(-1)
            ))
-    ''')
-    
-    GET_CALL_CHAIN = Template('''
+    """)
+
+    GET_CALL_CHAIN = Template("""
         cpg.method.name("$name")
            .repeat(_.caller)(_.times($depth))
            .dedup
@@ -61,11 +62,11 @@ class QueryTemplates:
                "name" -> m.name,
                "file" -> m.filename
            ))
-    ''')
-    
+    """)
+
     # ===== 数据流查询 =====
-    
-    DATAFLOW = Template('''
+
+    DATAFLOW = Template("""
         def source = cpg.method.name("$source_name").parameter
         def sink = cpg.call.name("$sink_name").argument
         
@@ -79,9 +80,9 @@ class QueryTemplates:
                 "file" -> e.file.name.headOption.getOrElse("unknown")
             ))
         ))
-    ''')
-    
-    DATAFLOW_VARIABLE = Template('''
+    """)
+
+    DATAFLOW_VARIABLE = Template("""
         def source = cpg.identifier.name("$variable_name")
         def sink = cpg.call.name("$sink_name").argument
         
@@ -98,11 +99,11 @@ class QueryTemplates:
                 "file" -> flow.sink.file.name.headOption.getOrElse("unknown")
             )
         ))
-    ''')
-    
+    """)
+
     # ===== 污点分析 =====
-    
-    TAINT_ANALYSIS = Template('''
+
+    TAINT_ANALYSIS = Template("""
         def sources = cpg.method.name("($source_pattern)").parameter
         def sinks = cpg.call.name("($sink_pattern)").argument
         
@@ -121,9 +122,9 @@ class QueryTemplates:
             ),
             "pathLength" -> flow.elements.size
         ))
-    ''')
-    
-    TAINT_ANALYSIS_SIMPLE = Template('''
+    """)
+
+    TAINT_ANALYSIS_SIMPLE = Template("""
         cpg.method.name("$source_method")
            .parameter
            .reachableBy(cpg.call.name("$sink_method"))
@@ -132,25 +133,25 @@ class QueryTemplates:
                "source" -> f.source.code,
                "sink" -> f.sink.code
            ))
-    ''')
-    
+    """)
+
     # ===== 控制流查询 =====
-    
-    GET_CFG = Template('''
+
+    GET_CFG = Template("""
         cpg.method.name("$name")
            .dotCfg
            .l
-    ''')
-    
-    GET_DOMINATORS = Template('''
+    """)
+
+    GET_DOMINATORS = Template("""
         cpg.method.name("$name")
            .dotDom
            .l
-    ''')
-    
+    """)
+
     # ===== 漏洞检测 =====
-    
-    FIND_SQL_INJECTION = Template('''
+
+    FIND_SQL_INJECTION = Template("""
         def sources = cpg.method.name("(get|post|request).*").parameter
         def sinks = cpg.call.name("(execute|query|createStatement)").argument
         
@@ -168,9 +169,9 @@ class QueryTemplates:
                 "line" -> flow.sink.lineNumber.getOrElse(-1)
             )
         ))
-    ''')
-    
-    FIND_COMMAND_INJECTION = Template('''
+    """)
+
+    FIND_COMMAND_INJECTION = Template("""
         def sources = cpg.method.name("(get|post|request).*").parameter
         def sinks = cpg.call.name("(exec|system|Runtime\\\\.getRuntime)").argument
         
@@ -188,11 +189,11 @@ class QueryTemplates:
                 "line" -> flow.sink.lineNumber.getOrElse(-1)
             )
         ))
-    ''')
-    
+    """)
+
     # ===== 代码搜索 =====
-    
-    SEARCH_BY_PATTERN = Template('''
+
+    SEARCH_BY_PATTERN = Template("""
         cpg.all.code(".*$pattern.*")
            .take($limit)
            .map(n => Map(
@@ -201,34 +202,36 @@ class QueryTemplates:
                "file" -> n.file.name.headOption.getOrElse("unknown"),
                "line" -> n.lineNumber.getOrElse(-1)
            ))
-    ''')
-    
+    """)
+
     @classmethod
     def build(cls, template_name: str, **kwargs) -> str:
         """
         构建查询
-        
+
         Args:
             template_name: 模板名称
             **kwargs: 模板参数
-            
+
         Returns:
             str: 构建好的查询字符串
-            
+
         Raises:
             ValueError: 模板不存在
         """
         template = getattr(cls, template_name, None)
         if not template:
             raise ValueError(f"Unknown template: {template_name}")
-        
+
         return template.substitute(**kwargs).strip()
-    
+
     @classmethod
     def list_templates(cls) -> list[str]:
         """列出所有可用的模板"""
         return [
-            name for name in dir(cls)
-            if not name.startswith('_') and name.isupper() and isinstance(getattr(cls, name), Template)
+            name
+            for name in dir(cls)
+            if not name.startswith("_")
+            and name.isupper()
+            and isinstance(getattr(cls, name), Template)
         ]
-
