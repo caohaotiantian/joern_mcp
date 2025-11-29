@@ -1,36 +1,37 @@
 """MCP服务器主入口"""
 
-import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+
 from loguru import logger
+
 from joern_mcp.config import settings
-from joern_mcp.mcp_server import mcp, server_state
-from joern_mcp.joern.server import JoernServerManager
 from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.server import JoernServerManager
+from joern_mcp.mcp_server import mcp, server_state
 
 
 @asynccontextmanager
-async def lifespan(app) -> AsyncIterator[None]:
+async def lifespan(_app) -> AsyncIterator[None]:
     """应用生命周期管理"""
     logger.info("Starting Joern MCP Server...")
 
     # 启动Joern Server
-    ServerState.joern_server = JoernServerManager()
-    await ServerState.joern_server.start()
+    server_state.joern_server = JoernServerManager()
+    await server_state.joern_server.start()
 
     # 初始化查询执行器
-    ServerState.query_executor = QueryExecutor(ServerState.joern_server)
+    server_state.query_executor = QueryExecutor(server_state.joern_server)
 
     logger.info("Joern MCP Server started successfully")
-    logger.info(f"Joern endpoint: {ServerState.joern_server.endpoint}")
+    logger.info(f"Joern endpoint: {server_state.joern_server.endpoint}")
 
     yield
 
     # 清理
     logger.info("Stopping Joern MCP Server...")
-    if ServerState.joern_server:
-        await ServerState.joern_server.stop()
+    if server_state.joern_server:
+        await server_state.joern_server.stop()
     logger.info("Joern MCP Server stopped")
 
 
@@ -53,13 +54,13 @@ async def health_check() -> dict:
         >>> await health_check()
         {"status": "healthy", "joern_endpoint": "localhost:8080"}
     """
-    if not ServerState.joern_server:
+    if not server_state.joern_server:
         return {"status": "unhealthy", "error": "Joern server not initialized"}
 
-    is_healthy = await ServerState.joern_server.health_check()
+    is_healthy = await server_state.joern_server.health_check()
     return {
         "status": "healthy" if is_healthy else "unhealthy",
-        "joern_endpoint": ServerState.joern_server.endpoint,
+        "joern_endpoint": server_state.joern_server.endpoint,
     }
 
 
@@ -82,14 +83,14 @@ async def execute_query(
         >>> await execute_query("cpg.method.name.l")
         {"success": True, "result": ["main", "foo", "bar"]}
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     if not settings.enable_custom_queries:
         return {"success": False, "error": "Custom queries are disabled"}
 
     try:
-        result = await ServerState.query_executor.execute(
+        result = await server_state.query_executor.execute(
             query, format=format, timeout=timeout
         )
         return {"success": True, "result": result.get("stdout", ""), "raw": result}
@@ -101,20 +102,10 @@ async def execute_query(
 def main() -> None:
     """主函数"""
     # 导入所有工具模块以注册MCP工具（延迟导入避免循环依赖）
-    from joern_mcp.tools import (
-        project,
-        query,
-        callgraph,
-        dataflow,
-        taint,
-        cfg,
-        batch,
-        export,
-    )  # noqa: F401
 
     # 导入资源和提示模块
-    from joern_mcp.resources import project_resources  # noqa: F401
     from joern_mcp.prompts import analysis_prompts  # noqa: F401
+    from joern_mcp.resources import project_resources  # noqa: F401
 
     logger.info("=" * 60)
     logger.info("Joern MCP Server")
@@ -126,7 +117,6 @@ def main() -> None:
     logger.info("=" * 60)
 
     # 运行MCP服务器
-    import sys
 
     # FastMCP通过stdio运行
     mcp.run(transport="stdio")

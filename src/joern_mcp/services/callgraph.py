@@ -1,8 +1,9 @@
 """调用图分析服务"""
 
 import json
-from typing import List, Dict, Optional, Set
+
 from loguru import logger
+
 from joern_mcp.joern.executor import QueryExecutor
 from joern_mcp.joern.templates import QueryTemplates
 
@@ -13,7 +14,7 @@ class CallGraphService:
     def __init__(self, query_executor: QueryExecutor):
         self.executor = query_executor
 
-    async def get_callers(self, function_name: str, depth: int = 1) -> Dict:
+    async def get_callers(self, function_name: str, depth: int = 1) -> dict:
         """
         获取函数的调用者
 
@@ -70,7 +71,7 @@ class CallGraphService:
             logger.exception(f"Error getting callers: {e}")
             return {"success": False, "error": str(e)}
 
-    async def get_callees(self, function_name: str, depth: int = 1) -> Dict:
+    async def get_callees(self, function_name: str, depth: int = 1) -> dict:
         """
         获取函数调用的其他函数
 
@@ -127,7 +128,7 @@ class CallGraphService:
 
     async def get_call_chain(
         self, function_name: str, max_depth: int = 5, direction: str = "up"
-    ) -> Dict:
+    ) -> dict:
         """
         获取函数的调用链
 
@@ -202,7 +203,7 @@ class CallGraphService:
         include_callers: bool = True,
         include_callees: bool = True,
         depth: int = 2,
-    ) -> Dict:
+    ) -> dict:
         """
         获取函数的完整调用图
 

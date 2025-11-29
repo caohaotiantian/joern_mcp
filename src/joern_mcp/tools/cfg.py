@@ -1,7 +1,7 @@
 """控制流分析MCP工具"""
 
-from typing import Optional
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp, server_state
 
 
@@ -26,7 +26,7 @@ async def get_control_flow_graph(function_name: str, format: str = "dot") -> dic
             "format": "dot"
         }
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     logger.info(f"Getting CFG for function: {function_name}")
@@ -47,7 +47,7 @@ async def get_control_flow_graph(function_name: str, format: str = "dot") -> dic
             '''
 
         # 执行查询（不自动添加.toJson，因为dotCfg返回的是字符串）
-        result = await ServerState.query_executor.execute(query, format="raw")
+        result = await server_state.query_executor.execute(query, format="raw")
 
         if result.get("success"):
             stdout = result.get("stdout", "")
@@ -85,14 +85,14 @@ async def get_dominators(function_name: str, format: str = "dot") -> dict:
             "dominators": "digraph DOM { ... }"
         }
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     logger.info(f"Getting dominators for function: {function_name}")
 
     try:
         query = f'cpg.method.name("{function_name}").dotDom.l'
-        result = await ServerState.query_executor.execute(query, format="raw")
+        result = await server_state.query_executor.execute(query, format="raw")
 
         if result.get("success"):
             stdout = result.get("stdout", "")
@@ -133,7 +133,7 @@ async def analyze_control_structures(function_name: str) -> dict:
             "count": 2
         }
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     logger.info(f"Analyzing control structures in: {function_name}")
@@ -150,7 +150,7 @@ async def analyze_control_structures(function_name: str) -> dict:
            ))
         '''
 
-        result = await ServerState.query_executor.execute(query)
+        result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
             import json

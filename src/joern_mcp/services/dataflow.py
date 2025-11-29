@@ -1,10 +1,10 @@
 """数据流分析服务"""
 
 import json
-from typing import Dict, Optional, List
+
 from loguru import logger
+
 from joern_mcp.joern.executor import QueryExecutor
-from joern_mcp.joern.templates import QueryTemplates
 
 
 class DataFlowService:
@@ -15,7 +15,7 @@ class DataFlowService:
 
     async def track_dataflow(
         self, source_method: str, sink_method: str, max_flows: int = 10
-    ) -> Dict:
+    ) -> dict:
         """
         追踪从源方法到汇方法的数据流
 
@@ -33,7 +33,7 @@ class DataFlowService:
             query = f'''
             def source = cpg.method.name("{source_method}").parameter
             def sink = cpg.call.name("{sink_method}").argument
-            
+
             sink.reachableBy(source).flows.take({max_flows}).map(flow => Map(
                 "source" -> Map(
                     "code" -> flow.source.code,
@@ -90,8 +90,8 @@ class DataFlowService:
             return {"success": False, "error": str(e)}
 
     async def analyze_variable_flow(
-        self, variable_name: str, sink_method: Optional[str] = None, max_flows: int = 10
-    ) -> Dict:
+        self, variable_name: str, sink_method: str | None = None, max_flows: int = 10
+    ) -> dict:
         """
         分析变量的数据流
 
@@ -111,7 +111,7 @@ class DataFlowService:
                 query = f'''
                 def source = cpg.identifier.name("{variable_name}")
                 def sink = cpg.call.name("{sink_method}").argument
-                
+
                 sink.reachableBy(source).flows.take({max_flows}).map(flow => Map(
                     "variable" -> "{variable_name}",
                     "source" -> Map(
@@ -176,8 +176,8 @@ class DataFlowService:
             return {"success": False, "error": str(e)}
 
     async def find_data_dependencies(
-        self, function_name: str, variable_name: Optional[str] = None
-    ) -> Dict:
+        self, function_name: str, variable_name: str | None = None
+    ) -> dict:
         """
         查找函数中的数据依赖关系
 

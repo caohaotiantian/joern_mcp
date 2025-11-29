@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """快速测试脚本 - 验证Week 1的代码是否正常工作"""
 
-import sys
 import asyncio
+import sys
 from pathlib import Path
 
 # 添加项目路径
@@ -18,7 +18,7 @@ print("📋 测试1: 配置系统")
 try:
     from joern_mcp.config import settings
 
-    print(f"  ✅ 配置加载成功")
+    print("  ✅ 配置加载成功")
     print(
         f"     - Joern Server: {settings.joern_server_host}:{settings.joern_server_port}"
     )
@@ -36,7 +36,7 @@ try:
     from loguru import logger
 
     logger.info("日志系统测试")
-    print(f"  ✅ 日志系统正常")
+    print("  ✅ 日志系统正常")
 except Exception as e:
     print(f"  ❌ 日志系统失败: {e}")
     sys.exit(1)
@@ -50,7 +50,7 @@ try:
 
     try:
         manager = JoernManager()
-        print(f"  ✅ Joern已找到")
+        print("  ✅ Joern已找到")
         print(f"     - 路径: {manager.joern_path}")
         version = manager.get_version()
         print(f"     - 版本: {version}")
@@ -58,15 +58,15 @@ try:
         # 验证安装
         validation = manager.validate_installation()
         if all(validation.values()):
-            print(f"  ✅ Joern安装完整")
+            print("  ✅ Joern安装完整")
         else:
             print(f"  ⚠️  Joern安装可能不完整: {validation}")
 
     except JoernNotFoundError:
-        print(f"  ⚠️  Joern未安装")
-        print(f"     可以通过以下命令安装:")
+        print("  ⚠️  Joern未安装")
+        print("     可以通过以下命令安装:")
         print(
-            f"     curl -L https://github.com/joernio/joern/releases/latest/download/joern-install.sh | sudo bash"
+            "     curl -L https://github.com/joernio/joern/releases/latest/download/joern-install.sh | sudo bash"
         )
 
 except Exception as e:
@@ -80,9 +80,9 @@ print()
 # 测试4: Joern Server（可选）
 print("🚀 测试4: Joern Server管理（可选 - 需要安装Joern）")
 try:
+    from joern_mcp.joern.executor import QueryExecutor
     from joern_mcp.joern.manager import JoernManager, JoernNotFoundError
     from joern_mcp.joern.server import JoernServerManager
-    from joern_mcp.joern.executor import QueryExecutor
 
     try:
         # 检查Joern是否可用
@@ -97,23 +97,23 @@ try:
             # 测试健康检查
             is_healthy = await server.health_check()
             if is_healthy:
-                print(f"  ✅ 健康检查通过")
+                print("  ✅ 健康检查通过")
             else:
-                print(f"  ⚠️  健康检查失败")
+                print("  ⚠️  健康检查失败")
 
             # 测试查询执行
             print("  测试查询执行...")
             executor = QueryExecutor(server)
             result = await executor.execute("1 + 1")
             if result.get("success"):
-                print(f"  ✅ 查询执行成功")
+                print("  ✅ 查询执行成功")
             else:
                 print(f"  ⚠️  查询执行失败: {result.get('stderr')}")
 
             # 停止服务器
             print("  停止Server...")
             await server.stop()
-            print(f"  ✅ Server已停止")
+            print("  ✅ Server已停止")
 
         asyncio.run(test_server())
 

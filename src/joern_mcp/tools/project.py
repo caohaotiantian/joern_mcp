@@ -2,14 +2,15 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
+
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp, server_state
 
 
 @mcp.tool()
 async def parse_project(
-    source_path: str, project_name: Optional[str] = None, language: str = "auto"
+    source_path: str, project_name: str | None = None, language: str = "auto"
 ) -> dict:
     """
     解析代码项目生成CPG
@@ -30,7 +31,7 @@ async def parse_project(
             "message": "Project parsed successfully"
         }
     """
-    if not ServerState.joern_server:
+    if not server_state.joern_server:
         return {"success": False, "error": "Joern server not initialized"}
 
     logger.info(f"Parsing project: {source_path}")
@@ -47,7 +48,7 @@ async def parse_project(
     try:
         # 导入代码
         result = await asyncio.to_thread(
-            ServerState.joern_server.import_code, str(path.absolute()), project_name
+            server_state.joern_server.import_code, str(path.absolute()), project_name
         )
 
         if result.get("success"):
@@ -85,7 +86,7 @@ async def list_projects() -> dict:
             "count": 2
         }
     """
-    if not ServerState.joern_server:
+    if not server_state.joern_server:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
@@ -93,7 +94,7 @@ async def list_projects() -> dict:
         from cpgqls_client import workspace_query
 
         query = workspace_query()
-        result = ServerState.joern_server.execute_query(query)
+        result = server_state.joern_server.execute_query(query)
 
         if result.get("success"):
             # 解析workspace输出
@@ -126,13 +127,13 @@ async def delete_project(project_name: str) -> dict:
         >>> await delete_project("my-app")
         {"success": True, "message": "Project deleted"}
     """
-    if not ServerState.joern_server:
+    if not server_state.joern_server:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
         # Joern的close命令
         query = f'close("{project_name}")'
-        result = ServerState.joern_server.execute_query(query)
+        result = server_state.joern_server.execute_query(query)
 
         if result.get("success"):
             logger.info(f"Project {project_name} deleted")

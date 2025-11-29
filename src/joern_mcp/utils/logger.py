@@ -1,8 +1,9 @@
 """日志配置"""
 
 import sys
-from pathlib import Path
+
 from loguru import logger
+
 from joern_mcp.config import settings
 
 

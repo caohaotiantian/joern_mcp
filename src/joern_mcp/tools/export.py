@@ -1,12 +1,11 @@
 """结果导出MCP工具"""
 
-import json
-import asyncio
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
+
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp, server_state
-from joern_mcp.config import settings
 
 
 @mcp.tool()
@@ -31,7 +30,7 @@ async def export_cpg(project_name: str, output_path: str, format: str = "bin") -
             "format": "bin"
         }
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     logger.info(f"Exporting CPG for project: {project_name}")
@@ -51,7 +50,7 @@ async def export_cpg(project_name: str, output_path: str, format: str = "bin") -
         else:
             return {"success": False, "error": f"Unsupported format: {format}"}
 
-        result = await ServerState.query_executor.execute(query)
+        result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
             return {
@@ -71,7 +70,7 @@ async def export_cpg(project_name: str, output_path: str, format: str = "bin") -
 
 @mcp.tool()
 async def export_analysis_results(
-    results: Dict[str, Any], output_path: str, format: str = "json"
+    results: dict[str, Any], output_path: str, format: str = "json"
 ) -> dict:
     """
     导出分析结果到文件
@@ -134,7 +133,7 @@ async def export_analysis_results(
         return {"success": False, "error": str(e)}
 
 
-def _format_as_markdown(results: Dict[str, Any]) -> str:
+def _format_as_markdown(results: dict[str, Any]) -> str:
     """格式化为Markdown"""
     lines = ["# 代码分析报告\n"]
 
@@ -166,7 +165,7 @@ def _format_as_markdown(results: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _format_as_csv(results: Dict[str, Any]) -> str:
+def _format_as_csv(results: dict[str, Any]) -> str:
     """格式化为CSV"""
     lines = [
         "Type,Severity,CWE,Source_File,Source_Line,Source_Code,Sink_File,Sink_Line,Sink_Code"

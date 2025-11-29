@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 """清理Joern相关的端口占用"""
 
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 # 添加src到路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from joern_mcp.utils.port_utils import get_port_info, kill_process_on_port
 from loguru import logger
+
+from joern_mcp.utils.port_utils import get_port_info, kill_process_on_port
 
 
 def check_joern_ports():

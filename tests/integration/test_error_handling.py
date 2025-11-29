@@ -1,10 +1,11 @@
 """错误处理和边界测试"""
 
-import pytest
 import asyncio
-from joern_mcp.joern.manager import JoernManager
-from joern_mcp.joern.server import JoernServerManager
+
+import pytest
+
 from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.manager import JoernManager
 from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.taint import TaintAnalysisService
 
@@ -104,7 +105,7 @@ class TestBoundaryConditions:
     async def test_concurrent_error_handling(self, joern_server):
         """测试并发错误处理"""
         import warnings
-        
+
         executor = QueryExecutor(joern_server)
 
         # 混合有效和无效查询

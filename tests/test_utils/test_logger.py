@@ -1,8 +1,7 @@
 """测试日志系统"""
 
-import pytest
-from pathlib import Path
 from loguru import logger
+
 from joern_mcp.utils.logger import setup_logging
 
 

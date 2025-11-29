@@ -5,10 +5,11 @@ tests/test_tools/test_project.py
 
 注意：这些测试不是直接测试MCP工具装饰器，而是测试底层逻辑和Service行为
 """
-import pytest
+
 import json
-from unittest.mock import MagicMock, AsyncMock
-from pathlib import Path
+from unittest.mock import AsyncMock
+
+import pytest
 
 
 class TestProjectManagementLogic:
@@ -21,28 +22,27 @@ class TestProjectManagementLogic:
         mock_joern_server.import_code = AsyncMock(
             return_value={"success": True, "project": "test_project"}
         )
-        
+
         result = await mock_joern_server.import_code("/tmp/test", "test_project")
-        
+
         assert result["success"] is True
         assert result["project"] == "test_project"
-        mock_joern_server.import_code.assert_called_once_with("/tmp/test", "test_project")
+        mock_joern_server.import_code.assert_called_once_with(
+            "/tmp/test", "test_project"
+        )
 
     @pytest.mark.asyncio
     async def test_list_projects_query(self, mock_query_executor):
         """测试列出项目查询"""
         projects_data = ["project1", "project2", "project3"]
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(projects_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(projects_data)}
         )
-        
+
         # 执行列出项目查询
         result = await mock_query_executor.execute("workspace.projects.l.toJson")
-        
+
         assert result["success"] is True
         data = json.loads(result["stdout"])
         assert len(data) == 3
@@ -54,32 +54,31 @@ class TestProjectManagementLogic:
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": "true"}
         )
-        
+
         # 执行删除项目查询
-        result = await mock_query_executor.execute('workspace.projects.find(_.name == "test").remove')
-        
+        result = await mock_query_executor.execute(
+            'workspace.projects.find(_.name == "test").remove'
+        )
+
         assert result["success"] is True
         assert result["stdout"] == "true"
 
     @pytest.mark.asyncio
     async def test_get_project_info_query(self, mock_query_executor):
         """测试获取项目信息查询"""
-        project_info = [{
-            "name": "test_project",
-            "inputPath": "/tmp/test",
-            "language": "C"
-        }]
-        
+        project_info = [
+            {"name": "test_project", "inputPath": "/tmp/test", "language": "C"}
+        ]
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(project_info)
-            }
+            return_value={"success": True, "stdout": json.dumps(project_info)}
         )
-        
+
         # 执行获取项目信息查询
-        result = await mock_query_executor.execute('workspace.projects.name("test_project").l.toJson')
-        
+        result = await mock_query_executor.execute(
+            'workspace.projects.name("test_project").l.toJson'
+        )
+
         assert result["success"] is True
         data = json.loads(result["stdout"])
         assert data[0]["name"] == "test_project"
@@ -94,9 +93,9 @@ class TestProjectManagementEdgeCases:
         mock_joern_server.import_code = AsyncMock(
             return_value={"success": False, "error": "Path not found"}
         )
-        
+
         result = await mock_joern_server.import_code("/nonexistent/path", "test")
-        
+
         assert result["success"] is False
         assert "error" in result
 
@@ -106,21 +105,23 @@ class TestProjectManagementEdgeCases:
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": "false"}  # 没有找到项目
         )
-        
-        result = await mock_query_executor.execute('workspace.projects.find(_.name == "nonexistent").remove')
-        
+
+        result = await mock_query_executor.execute(
+            'workspace.projects.find(_.name == "nonexistent").remove'
+        )
+
         assert result["success"] is True
         assert result["stdout"] == "false"
 
-    @pytest.mark.asyncio  
+    @pytest.mark.asyncio
     async def test_list_projects_empty(self, mock_query_executor):
         """测试列出空项目列表"""
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": "[]"}
         )
-        
+
         result = await mock_query_executor.execute("workspace.projects.l.toJson")
-        
+
         assert result["success"] is True
         assert result["stdout"] == "[]"
 
@@ -130,9 +131,9 @@ class TestProjectManagementEdgeCases:
         mock_joern_server.import_code = AsyncMock(
             return_value={"success": False, "error": "Project already exists"}
         )
-        
+
         result = await mock_joern_server.import_code("/tmp/test", "existing_project")
-        
+
         assert result["success"] is False
         assert "error" in result
 
@@ -142,8 +143,8 @@ class TestProjectManagementEdgeCases:
         mock_query_executor.execute = AsyncMock(
             return_value={"success": False, "stderr": "Connection error"}
         )
-        
+
         result = await mock_query_executor.execute("workspace.projects.l.toJson")
-        
+
         assert result["success"] is False
         assert "stderr" in result

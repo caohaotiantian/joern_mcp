@@ -1,14 +1,14 @@
 """污点分析MCP工具"""
 
-from typing import Optional
-from loguru import logger
+
+
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.taint import TaintAnalysisService
 
 
 @mcp.tool()
 async def find_vulnerabilities(
-    rule_name: Optional[str] = None, severity: Optional[str] = None, max_flows: int = 10
+    rule_name: str | None = None, severity: str | None = None, max_flows: int = 10
 ) -> dict:
     """
     查找代码中的安全漏洞

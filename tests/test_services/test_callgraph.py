@@ -1,7 +1,9 @@
 """测试调用图分析服务"""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+
 from joern_mcp.services.callgraph import CallGraphService
 
 

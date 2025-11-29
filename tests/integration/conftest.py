@@ -1,6 +1,7 @@
 """集成测试配置"""
 
 import asyncio
+import contextlib
 import socket
 from pathlib import Path
 
@@ -161,7 +162,7 @@ async def joern_server(event_loop):
     # 查找可用端口
     max_retries = 3
     server = None
-    
+
     for attempt in range(max_retries):
         try:
             port = find_free_port()
@@ -174,19 +175,17 @@ async def joern_server(event_loop):
             logger.info("💡 Tip: Check another terminal with: ps aux | grep joern")
             await server.start(timeout=180)
             logger.success(f"✅ Joern server started successfully on port {port}")
-            
+
             # 启动成功，跳出循环
             break
 
         except Exception as e:
             logger.error(f"Attempt {attempt + 1} failed: {e}")
-            
+
             # 清理失败的server
             if server and server.process:
-                try:
+                with contextlib.suppress(Exception):
                     await server.stop()
-                except Exception:
-                    pass
 
             # 如果不是最后一次尝试，继续
             if attempt < max_retries - 1:
@@ -198,7 +197,7 @@ async def joern_server(event_loop):
                 pytest.skip(
                     f"Could not start Joern server after {max_retries} attempts: {e}"
                 )
-    
+
     # 提供服务器给所有测试
     try:
         yield server
@@ -225,12 +224,12 @@ async def joern_server(event_loop):
 @pytest.fixture(scope="function", autouse=True)
 async def ensure_joern_server_health(joern_server):
     """在每个测试前确保Joern server健康
-    
+
     如果server崩溃，尝试重启
     """
     if not joern_server:
         pytest.skip("Joern server not available")
-    
+
     # 检查server是否仍在运行
     if not joern_server.is_running():
         logger.warning("⚠️  Joern server appears to be stopped, attempting restart...")
@@ -240,8 +239,8 @@ async def ensure_joern_server_health(joern_server):
         except Exception as e:
             logger.error(f"❌ Failed to restart Joern server: {e}")
             pytest.skip(f"Joern server unavailable: {e}")
-    
+
     # 执行测试
     yield
-    
+
     # 测试后不需要特殊处理（session级别的fixture会负责清理）

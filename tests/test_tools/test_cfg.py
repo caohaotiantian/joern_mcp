@@ -3,9 +3,11 @@ tests/test_tools/test_cfg.py
 
 测试控制流图(CFG)工具
 """
-import pytest
+
 import json
 from unittest.mock import AsyncMock
+
+import pytest
 
 
 class TestCFGTools:
@@ -20,24 +22,18 @@ class TestCFGTools:
             "nodes": [
                 {"id": 1, "code": "int main()", "type": "ENTRY"},
                 {"id": 2, "code": "if (x > 0)", "type": "CONTROL_STRUCTURE"},
-                {"id": 3, "code": "return 0", "type": "RETURN"}
+                {"id": 3, "code": "return 0", "type": "RETURN"},
             ],
-            "edges": [
-                {"source": 1, "target": 2},
-                {"source": 2, "target": 3}
-            ]
+            "edges": [{"source": 1, "target": 2}, {"source": 2, "target": 3}],
         }
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(cfg_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(cfg_data)}
         )
-        
+
         # CFG查询应该返回图结构
-        result = await mock_query_executor.execute("cpg.method.name(\"main\").cfg")
-        
+        result = await mock_query_executor.execute('cpg.method.name("main").cfg')
+
         assert result["success"] is True
         data = json.loads(result["stdout"])
         assert data["function"] == "main"
@@ -49,18 +45,17 @@ class TestCFGTools:
         cfg_data = {
             "function": "complex_func",
             "nodes": [{"id": i, "code": f"stmt{i}"} for i in range(10)],
-            "edges": [{"source": i, "target": i+1} for i in range(9)]
+            "edges": [{"source": i, "target": i + 1} for i in range(9)],
         }
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(cfg_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(cfg_data)}
         )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"complex_func\").cfg")
-        
+
+        result = await mock_query_executor.execute(
+            'cpg.method.name("complex_func").cfg'
+        )
+
         assert result["success"] is True
         data = json.loads(result["stdout"])
         assert len(data["nodes"]) == 10
@@ -73,24 +68,21 @@ class TestCFGTools:
             "nodes": [
                 {"id": 1, "code": "while(true)", "type": "CONTROL_STRUCTURE"},
                 {"id": 2, "code": "work()", "type": "CALL"},
-                {"id": 3, "code": "break", "type": "BREAK"}
+                {"id": 3, "code": "break", "type": "BREAK"},
             ],
             "edges": [
                 {"source": 1, "target": 2},
                 {"source": 2, "target": 1},  # 循环边
-                {"source": 2, "target": 3}   # 退出边
-            ]
+                {"source": 2, "target": 3},  # 退出边
+            ],
         }
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(cfg_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(cfg_data)}
         )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"loop_func\").cfg")
-        
+
+        result = await mock_query_executor.execute('cpg.method.name("loop_func").cfg')
+
         assert result["success"] is True
         data = json.loads(result["stdout"])
         # 验证循环边存在
@@ -104,18 +96,17 @@ class TestCFGTools:
             "dominators": [
                 {"node": 1, "dominates": [2, 3, 4]},
                 {"node": 2, "dominates": [3]},
-            ]
+            ],
         }
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(dom_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(dom_data)}
         )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"test_func\").dominatorTree")
-        
+
+        result = await mock_query_executor.execute(
+            'cpg.method.name("test_func").dominatorTree'
+        )
+
         assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -125,18 +116,17 @@ class TestCFGTools:
             "function": "test_func",
             "post_dominators": [
                 {"node": 5, "post_dominates": [4, 3, 2, 1]},
-            ]
+            ],
         }
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(postdom_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(postdom_data)}
         )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"test_func\").postDominatorTree")
-        
+
+        result = await mock_query_executor.execute(
+            'cpg.method.name("test_func").postDominatorTree'
+        )
+
         assert result["success"] is True
 
 
@@ -149,18 +139,15 @@ class TestCFGEdgeCases:
         cfg_data = {
             "function": "empty",
             "nodes": [{"id": 1, "code": "void empty() {}", "type": "ENTRY"}],
-            "edges": []
+            "edges": [],
         }
-        
+
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(cfg_data)
-            }
+            return_value={"success": True, "stdout": json.dumps(cfg_data)}
         )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"empty\").cfg")
-        
+
+        result = await mock_query_executor.execute('cpg.method.name("empty").cfg')
+
         assert result["success"] is True
         data = json.loads(result["stdout"])
         assert len(data["nodes"]) >= 1
@@ -169,14 +156,11 @@ class TestCFGEdgeCases:
     async def test_function_not_found(self, mock_query_executor):
         """测试函数不存在"""
         mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": False,
-                "stderr": "Function not found"
-            }
+            return_value={"success": False, "stderr": "Function not found"}
         )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"nonexistent\").cfg")
-        
+
+        result = await mock_query_executor.execute('cpg.method.name("nonexistent").cfg')
+
         assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -186,21 +170,17 @@ class TestCFGEdgeCases:
             "function": "unreachable_func",
             "nodes": [
                 {"id": 1, "code": "return 0", "type": "RETURN"},
-                {"id": 2, "code": "unreachable()", "type": "CALL", "unreachable": True}
+                {"id": 2, "code": "unreachable()", "type": "CALL", "unreachable": True},
             ],
-            "edges": [
-                {"source": 1, "target": 2, "type": "UNREACHABLE"}
-            ]
+            "edges": [{"source": 1, "target": 2, "type": "UNREACHABLE"}],
         }
-        
-        mock_query_executor.execute = AsyncMock(
-            return_value={
-                "success": True,
-                "stdout": json.dumps(cfg_data)
-            }
-        )
-        
-        result = await mock_query_executor.execute("cpg.method.name(\"unreachable_func\").cfg")
-        
-        assert result["success"] is True
 
+        mock_query_executor.execute = AsyncMock(
+            return_value={"success": True, "stdout": json.dumps(cfg_data)}
+        )
+
+        result = await mock_query_executor.execute(
+            'cpg.method.name("unreachable_func").cfg'
+        )
+
+        assert result["success"] is True

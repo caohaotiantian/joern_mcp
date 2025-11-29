@@ -1,18 +1,22 @@
 """测试Joern管理器"""
 
-import pytest
 import shutil
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
 from joern_mcp.joern.manager import JoernManager, JoernNotFoundError
 
 
 def test_detect_joern_from_path():
     """测试从PATH检测Joern"""
-    with patch("shutil.which", return_value="/usr/local/bin/joern"):
-        with patch.object(Path, "exists", return_value=True):
-            manager = JoernManager()
-            assert manager.joern_path is not None
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+    ):
+        manager = JoernManager()
+        assert manager.joern_path is not None
 
 
 def test_detect_joern_not_found(monkeypatch):
@@ -35,6 +39,7 @@ def test_get_version_real():
     assert len(version) > 0
     # 验证版本号是合法格式（数字.数字.数字 或 HEAD+日期）
     import re
+
     assert re.match(r"(\d+\.\d+\.\d+)|(HEAD\+\d{8}-\d{4})", version)
 
 
@@ -57,10 +62,12 @@ def test_ensure_directories(tmp_path, monkeypatch):
     monkeypatch.setattr(config.settings, "joern_workspace", workspace)
     monkeypatch.setattr(config.settings, "joern_cpg_cache", cpg_cache)
 
-    with patch("shutil.which", return_value="/usr/local/bin/joern"):
-        with patch.object(Path, "exists", return_value=True):
-            manager = JoernManager()
-            manager.ensure_directories()
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+    ):
+        manager = JoernManager()
+        manager.ensure_directories()
 
     assert workspace.exists()
     assert cpg_cache.exists()
@@ -69,15 +76,15 @@ def test_ensure_directories(tmp_path, monkeypatch):
 def test_detect_joern_from_config(monkeypatch, tmp_path):
     """测试从配置检测Joern"""
     from joern_mcp import config
-    
+
     joern_home = tmp_path / "joern"
     joern_home.mkdir()
     joern_bin = joern_home / "joern"
     joern_bin.touch()
     joern_bin.chmod(0o755)
-    
+
     monkeypatch.setattr(config.settings, "joern_home", joern_home)
-    
+
     with patch("shutil.which", return_value=None):
         manager = JoernManager()
         assert manager.joern_path is not None
@@ -85,12 +92,14 @@ def test_detect_joern_from_config(monkeypatch, tmp_path):
 
 def test_get_version_with_error():
     """测试获取版本出错时返回unknown"""
-    with patch("shutil.which", return_value="/usr/local/bin/joern"):
-        with patch.object(Path, "exists", return_value=True):
-            with patch("subprocess.run", side_effect=Exception("Test error")):
-                manager = JoernManager()
-                version = manager.get_version()
-                assert version == "unknown"
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+        patch("subprocess.run", side_effect=Exception("Test error")),
+    ):
+        manager = JoernManager()
+        version = manager.get_version()
+        assert version == "unknown"
 
 
 def test_validate_installation_structure():

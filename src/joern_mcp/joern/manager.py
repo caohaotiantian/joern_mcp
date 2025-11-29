@@ -4,8 +4,9 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict
+
 from loguru import logger
+
 from joern_mcp.config import settings
 
 
@@ -19,8 +20,8 @@ class JoernManager:
     """Joern安装和版本管理"""
 
     def __init__(self) -> None:
-        self.joern_path: Optional[Path] = None
-        self.version: Optional[str] = None
+        self.joern_path: Path | None = None
+        self.version: str | None = None
         self._detect_joern()
 
     def _detect_joern(self) -> None:
@@ -89,7 +90,7 @@ class JoernManager:
                 self.version = match.group(1)
                 logger.info(f"Joern version: {self.version}")
                 return self.version
-            
+
             # 尝试匹配HEAD+日期格式（如HEAD+20251127-0814）- 在整个输出中搜索
             match = re.search(r"(HEAD\+\d{8}-\d{4})", output)
             if match:
@@ -104,7 +105,7 @@ class JoernManager:
             logger.error(f"Failed to get Joern version: {e}")
             return "unknown"
 
-    def validate_installation(self) -> Dict[str, bool]:
+    def validate_installation(self) -> dict[str, bool]:
         """验证Joern安装完整性"""
         result = {
             "joern_found": self.joern_path is not None,

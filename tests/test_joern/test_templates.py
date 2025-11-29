@@ -1,6 +1,7 @@
 """测试查询模板"""
 
 import pytest
+
 from joern_mcp.joern.templates import QueryTemplates
 
 

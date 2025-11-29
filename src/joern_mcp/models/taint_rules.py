@@ -1,6 +1,5 @@
 """污点分析规则定义"""
 
-from typing import List, Dict
 from dataclasses import dataclass
 
 
@@ -11,8 +10,8 @@ class TaintRule:
     name: str
     description: str
     severity: str  # HIGH, MEDIUM, LOW
-    sources: List[str]  # 污点源（正则表达式列表）
-    sinks: List[str]  # 污点汇（正则表达式列表）
+    sources: list[str]  # 污点源（正则表达式列表）
+    sinks: list[str]  # 污点汇（正则表达式列表）
     cwe_id: str = ""  # CWE编号
 
 
@@ -199,12 +198,12 @@ def get_rule_by_name(name: str) -> TaintRule:
     raise ValueError(f"Rule not found: {name}")
 
 
-def get_rules_by_severity(severity: str) -> List[TaintRule]:
+def get_rules_by_severity(severity: str) -> list[TaintRule]:
     """根据严重程度获取规则"""
     return [rule for rule in VULNERABILITY_RULES if rule.severity == severity]
 
 
-def list_all_rules() -> List[Dict]:
+def list_all_rules() -> list[dict]:
     """列出所有规则"""
     return [
         {

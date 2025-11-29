@@ -9,8 +9,9 @@ from pathlib import Path
 # 添加src到路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from joern_mcp.joern.server import JoernServerManager
 from loguru import logger
+
+from joern_mcp.joern.server import JoernServerManager
 
 
 async def test_server_startup():

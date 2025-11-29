@@ -1,7 +1,7 @@
 """数据流分析MCP工具"""
 
-from typing import Optional
-from loguru import logger
+
+
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.dataflow import DataFlowService
 
@@ -43,7 +43,7 @@ async def track_dataflow(
 
 @mcp.tool()
 async def analyze_variable_flow(
-    variable_name: str, sink_method: Optional[str] = None, max_flows: int = 10
+    variable_name: str, sink_method: str | None = None, max_flows: int = 10
 ) -> dict:
     """
     分析变量的数据流
@@ -77,7 +77,7 @@ async def analyze_variable_flow(
 
 @mcp.tool()
 async def find_data_dependencies(
-    function_name: str, variable_name: Optional[str] = None
+    function_name: str, variable_name: str | None = None
 ) -> dict:
     """
     查找函数中的数据依赖关系

@@ -1,10 +1,12 @@
 """性能和压力测试"""
 
-import pytest
-import time
 import asyncio
-from joern_mcp.joern.manager import JoernManager
+import time
+
+import pytest
+
 from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.manager import JoernManager
 
 
 @pytest.mark.integration
@@ -29,10 +31,12 @@ class TestPerformance:
         assert elapsed < 10.0  # 应该在10秒内完成（给更多时间）
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="CPGQLSClient has event loop限制，不支持真正的高并发（>3）")
+    @pytest.mark.xfail(
+        reason="CPGQLSClient has event loop限制，不支持真正的高并发（>3）"
+    )
     async def test_concurrent_query_performance(self, joern_server):
         """测试并发查询性能
-        
+
         注意：此测试预期失败，因为CPGQLSClient库的设计限制：
         - 内部使用run_until_complete()
         - 不支持在已有event loop中高并发
@@ -89,7 +93,7 @@ class TestStress:
     @pytest.mark.xfail(reason="CPGQLSClient不支持20个并发查询（event loop冲突）")
     async def test_high_concurrency(self, joern_server):
         """测试高并发
-        
+
         注意：此测试预期失败，原因：
         - CPGQLSClient使用run_until_complete()，在已有event loop中会冲突
         - 20个并发远超库的设计容量
@@ -117,6 +121,6 @@ class TestStress:
         executor = QueryExecutor(joern_server)
 
         # 连续执行多个查询
-        for i in range(10):
+        for _i in range(10):
             result = await executor.execute("cpg.method.name.l")
             assert result is not None

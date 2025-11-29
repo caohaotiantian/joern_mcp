@@ -2,7 +2,6 @@
 
 import asyncio
 
-import httpx
 from cpgqls_client import CPGQLSClient, import_code_query
 from loguru import logger
 
@@ -84,7 +83,7 @@ class JoernServerManager:
             logger.info(f"Joern server process started (PID: {self.process.pid})")
         except Exception as e:
             logger.error(f"Failed to start Joern server: {e}")
-            raise JoernServerError(f"Failed to start server: {e}")
+            raise JoernServerError(f"Failed to start server: {e}") from None
 
         # 等待服务器就绪
         try:
@@ -151,18 +150,18 @@ class JoernServerManager:
                             )
                             logger.error(f"Server stdout: {stdout_data.decode()}")
                             logger.error(f"Server stderr: {stderr_data.decode()}")
-                        except:
+                        except Exception:  # noqa: S110
                             pass
                     raise TimeoutError(
                         f"Joern server failed to start within {timeout}s"
-                    )
+                    ) from None
 
                 # 检查进程是否已退出
                 if self.process and self.process.returncode is not None:
                     stderr = (
                         await self.process.stderr.read() if self.process.stderr else b""
                     )
-                    raise JoernServerError(f"Server process exited: {stderr.decode()}")
+                    raise JoernServerError(f"Server process exited: {stderr.decode()}") from None
 
                 await asyncio.sleep(1.0)  # 增加等待间隔
 
@@ -221,7 +220,7 @@ class JoernServerManager:
     def execute_query(self, query: str) -> dict:
         """执行查询（同步）"""
         if not self.client:
-            raise JoernServerError("Server not started")
+            raise JoernServerError("Server not started") from None
 
         logger.debug(f"Executing query: {query[:100]}...")
         try:
@@ -230,28 +229,26 @@ class JoernServerManager:
             return result
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
-            raise JoernServerError(f"Query failed: {e}")
-    
+            raise JoernServerError(f"Query failed: {e}") from None
+
     async def execute_query_async(self, query: str) -> dict:
         """执行查询（异步）- 在已有event loop中使用"""
         import concurrent.futures
-        
+
         if not self.client:
-            raise JoernServerError("Server not started")
+            raise JoernServerError("Server not started") from None
 
         logger.debug(f"Executing query (async): {query[:100]}...")
-        
+
         # 在线程池中运行同步的execute_query
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             try:
-                result = await loop.run_in_executor(
-                    executor, self.execute_query, query
-                )
+                result = await loop.run_in_executor(executor, self.execute_query, query)
                 return result
             except Exception as e:
                 logger.error(f"Async query execution failed: {e}")
-                raise JoernServerError(f"Query failed: {e}")
+                raise JoernServerError(f"Query failed: {e}") from None
 
     async def import_code(self, source_path: str, project_name: str) -> dict:
         """导入代码生成CPG"""

@@ -69,7 +69,7 @@ class QueryTemplates:
     DATAFLOW = Template("""
         def source = cpg.method.name("$source_name").parameter
         def sink = cpg.call.name("$sink_name").argument
-        
+
         sink.reachableBy(source).flows.map(flow => Map(
             "source" -> flow.source.code,
             "sink" -> flow.sink.code,
@@ -85,7 +85,7 @@ class QueryTemplates:
     DATAFLOW_VARIABLE = Template("""
         def source = cpg.identifier.name("$variable_name")
         def sink = cpg.call.name("$sink_name").argument
-        
+
         sink.reachableBy(source).flows.map(flow => Map(
             "variable" -> "$variable_name",
             "source" -> Map(
@@ -106,7 +106,7 @@ class QueryTemplates:
     TAINT_ANALYSIS = Template("""
         def sources = cpg.method.name("($source_pattern)").parameter
         def sinks = cpg.call.name("($sink_pattern)").argument
-        
+
         sinks.reachableBy(sources).flows.map(flow => Map(
             "vulnerability" -> "Potential Taint Flow",
             "severity" -> "$severity",
@@ -154,7 +154,7 @@ class QueryTemplates:
     FIND_SQL_INJECTION = Template("""
         def sources = cpg.method.name("(get|post|request).*").parameter
         def sinks = cpg.call.name("(execute|query|createStatement)").argument
-        
+
         sinks.reachableBy(sources).flows.map(flow => Map(
             "vulnerability" -> "SQL Injection",
             "severity" -> "HIGH",
@@ -174,7 +174,7 @@ class QueryTemplates:
     FIND_COMMAND_INJECTION = Template("""
         def sources = cpg.method.name("(get|post|request).*").parameter
         def sinks = cpg.call.name("(exec|system|Runtime\\\\.getRuntime)").argument
-        
+
         sinks.reachableBy(sources).flows.map(flow => Map(
             "vulnerability" -> "Command Injection",
             "severity" -> "CRITICAL",

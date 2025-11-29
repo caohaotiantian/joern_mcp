@@ -1,9 +1,11 @@
 """测试MCP Server生命周期"""
 
-import pytest
 import asyncio
-from joern_mcp.joern.manager import JoernManager
+
+import pytest
+
 from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.manager import JoernManager
 
 
 @pytest.mark.integration
@@ -43,7 +45,7 @@ class TestServerLifecycle:
     async def test_concurrent_queries(self, joern_server):
         """测试并发查询"""
         import warnings
-        
+
         executor = QueryExecutor(joern_server)
 
         # 创建多个并发查询

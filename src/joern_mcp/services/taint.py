@@ -1,13 +1,13 @@
 """污点分析服务"""
 
 import json
-from typing import Dict, List, Optional
+
 from loguru import logger
+
 from joern_mcp.joern.executor import QueryExecutor
-from joern_mcp.joern.templates import QueryTemplates
 from joern_mcp.models.taint_rules import (
-    TaintRule,
     VULNERABILITY_RULES,
+    TaintRule,
     get_rule_by_name,
     get_rules_by_severity,
     list_all_rules,
@@ -20,7 +20,7 @@ class TaintAnalysisService:
     def __init__(self, query_executor: QueryExecutor):
         self.executor = query_executor
 
-    async def analyze_with_rule(self, rule: TaintRule, max_flows: int = 10) -> Dict:
+    async def analyze_with_rule(self, rule: TaintRule, max_flows: int = 10) -> dict:
         """
         使用特定规则进行污点分析
 
@@ -41,7 +41,7 @@ class TaintAnalysisService:
             query = f'''
             def sources = cpg.method.name("({source_pattern})").parameter
             def sinks = cpg.call.name("({sink_pattern})").argument
-            
+
             sinks.reachableBy(sources).flows.take({max_flows}).map(flow => Map(
                 "vulnerability" -> "{rule.name}",
                 "severity" -> "{rule.severity}",
@@ -94,10 +94,10 @@ class TaintAnalysisService:
 
     async def find_vulnerabilities(
         self,
-        rule_name: Optional[str] = None,
-        severity: Optional[str] = None,
+        rule_name: str | None = None,
+        severity: str | None = None,
         max_flows: int = 10,
-    ) -> Dict:
+    ) -> dict:
         """
         查找漏洞
 
@@ -148,7 +148,7 @@ class TaintAnalysisService:
 
     async def check_specific_flow(
         self, source_pattern: str, sink_pattern: str, max_flows: int = 10
-    ) -> Dict:
+    ) -> dict:
         """
         检查特定的污点流
 
@@ -166,7 +166,7 @@ class TaintAnalysisService:
             query = f"""
             def sources = cpg.method.name("({source_pattern})").parameter
             def sinks = cpg.call.name("({sink_pattern})").argument
-            
+
             sinks.reachableBy(sources).flows.take({max_flows}).map(flow => Map(
                 "source" -> Map(
                     "code" -> flow.source.code,
@@ -217,7 +217,7 @@ class TaintAnalysisService:
             logger.exception(f"Error checking taint flow: {e}")
             return {"success": False, "error": str(e)}
 
-    def list_rules(self) -> Dict:
+    def list_rules(self) -> dict:
         """列出所有可用的规则"""
         return {
             "success": True,
@@ -225,7 +225,7 @@ class TaintAnalysisService:
             "count": len(VULNERABILITY_RULES),
         }
 
-    def get_rule_details(self, rule_name: str) -> Dict:
+    def get_rule_details(self, rule_name: str) -> dict:
         """获取规则详情"""
         try:
             rule = get_rule_by_name(rule_name)

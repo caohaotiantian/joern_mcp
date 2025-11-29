@@ -2,7 +2,6 @@
 
 from fastmcp import FastMCP
 
-
 # 创建MCP应用
 mcp = FastMCP("Joern Code Analysis")
 

@@ -1,14 +1,15 @@
 """代码查询MCP工具"""
 
 import json
-from typing import Optional
+
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp, server_state
 
 
 @mcp.tool()
 async def get_function_code(
-    function_name: str, file_filter: Optional[str] = None
+    function_name: str, file_filter: str | None = None
 ) -> dict:
     """
     获取指定函数的源代码
@@ -93,7 +94,7 @@ async def get_function_code(
 
 
 @mcp.tool()
-async def list_functions(name_filter: Optional[str] = None, limit: int = 100) -> dict:
+async def list_functions(name_filter: str | None = None, limit: int = 100) -> dict:
     """
     列出所有函数
 

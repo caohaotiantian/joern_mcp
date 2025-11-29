@@ -1,10 +1,10 @@
 """测试MCP Tools集成"""
 
+
 import pytest
-from pathlib import Path
-from joern_mcp.joern.manager import JoernManager
-from joern_mcp.joern.server import JoernServerManager
+
 from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.manager import JoernManager
 from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.dataflow import DataFlowService
 from joern_mcp.services.taint import TaintAnalysisService

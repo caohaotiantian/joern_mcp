@@ -1,7 +1,5 @@
 """调用图分析MCP工具"""
 
-from typing import Optional
-from loguru import logger
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.callgraph import CallGraphService
 

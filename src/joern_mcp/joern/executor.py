@@ -1,11 +1,12 @@
 """查询执行器"""
 
-import hashlib
 import asyncio
+import hashlib
 import re
-from typing import Dict, Optional, Tuple
+
 from cachetools import TTLCache
 from loguru import logger
+
 from joern_mcp.config import settings
 from joern_mcp.joern.server import JoernServerManager
 
@@ -46,9 +47,9 @@ class QueryExecutor:
         self,
         query: str,
         format: str = "json",
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
         use_cache: bool = True,
-    ) -> Dict:
+    ) -> dict:
         """
         执行查询
 
@@ -95,16 +96,16 @@ class QueryExecutor:
                     )
             except asyncio.TimeoutError:
                 logger.error(f"Query timeout after {timeout_val}s")
-                raise QueryExecutionError(f"Query timeout after {timeout_val}s")
+                raise QueryExecutionError(f"Query timeout after {timeout_val}s") from None
             except Exception as e:
                 logger.error(f"Query execution failed: {e}")
-                raise QueryExecutionError(str(e))
+                raise QueryExecutionError(str(e)) from None
 
         # 5. 处理结果
         if not result.get("success"):
             stderr = result.get("stderr", "Unknown error")
             logger.error(f"Query failed: {stderr}")
-            raise QueryExecutionError(stderr)
+            raise QueryExecutionError(stderr) from None
 
         # 6. 缓存结果
         if use_cache:
@@ -113,7 +114,7 @@ class QueryExecutor:
         logger.debug("Query completed successfully")
         return result
 
-    def _validate_query(self, query: str) -> Tuple[bool, str]:
+    def _validate_query(self, query: str) -> tuple[bool, str]:
         """验证查询安全性"""
         # 检查长度
         if len(query) > 10000:
@@ -137,9 +138,8 @@ class QueryExecutor:
                     query = f"({query}).toJson"
                 else:
                     query = f"{query}.toJson"
-        elif format == "dot":
-            if not query.endswith(".toDot"):
-                query = f"{query}.toDot"
+        elif format == "dot" and not query.endswith(".toDot"):
+            query = f"{query}.toDot"
 
         return query
 

@@ -3,13 +3,10 @@ tests/test_utils/test_port_utils.py
 
 测试端口管理工具
 """
-import pytest
+
 import socket
-from joern_mcp.utils.port_utils import (
-    find_free_port,
-    is_port_available,
-    is_port_in_use
-)
+
+from joern_mcp.utils.port_utils import find_free_port, is_port_available, is_port_in_use
 
 
 class TestPortUtils:
@@ -42,7 +39,7 @@ class TestPortUtils:
             sock.bind(("localhost", 0))  # 让系统分配端口
             sock.listen(1)
             port = sock.getsockname()[1]
-            
+
             # 端口应该不可用
             assert not is_port_available(port, host="localhost")
         finally:
@@ -56,7 +53,7 @@ class TestPortUtils:
             sock.bind(("localhost", 0))
             sock.listen(1)
             port = sock.getsockname()[1]
-            
+
             assert is_port_in_use(port, host="localhost")
         finally:
             sock.close()
@@ -95,38 +92,38 @@ class TestPortUtilsEdgeCases:
         """测试端口生命周期"""
         # 找一个空闲端口
         port = find_free_port(start_port=50300, end_port=50400)
-        
+
         # 初始应该可用
         assert is_port_available(port)
-        
+
         # 占用端口
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.bind(("localhost", port))
             sock.listen(1)
-            
+
             # 应该不可用
             assert not is_port_available(port)
             assert is_port_in_use(port)
         finally:
             sock.close()
-        
+
         # 关闭后可能需要一点时间才能释放
         # 所以这里不强制要求立即可用
 
     def test_concurrent_port_operations(self):
         """测试并发端口操作"""
         import concurrent.futures
-        
+
         def check_port():
             port = find_free_port(start_port=50400, end_port=50500)
             return is_port_available(port)
-        
+
         # 多个线程同时操作
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(check_port) for _ in range(5)]
             results = [f.result() for f in futures]
-        
+
         # 所有操作都应该成功
         assert len(results) == 5
         assert all(isinstance(r, bool) for r in results)

@@ -1,13 +1,14 @@
 """批量操作MCP工具"""
 
 import asyncio
-from typing import List, Dict
+
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp, server_state
 
 
 @mcp.tool()
-async def batch_query(queries: List[str], timeout: int = 300) -> dict:
+async def batch_query(queries: list[str], timeout: int = 300) -> dict:
     """
     批量执行多个查询
 
@@ -31,7 +32,7 @@ async def batch_query(queries: List[str], timeout: int = 300) -> dict:
             "failed": 0
         }
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     if len(queries) > 20:
@@ -46,7 +47,7 @@ async def batch_query(queries: List[str], timeout: int = 300) -> dict:
     try:
         # 并发执行所有查询
         tasks = [
-            ServerState.query_executor.execute(query, timeout=timeout)
+            server_state.query_executor.execute(query, timeout=timeout)
             for query in queries
         ]
 
@@ -91,7 +92,7 @@ async def batch_query(queries: List[str], timeout: int = 300) -> dict:
 
 
 @mcp.tool()
-async def batch_function_analysis(function_names: List[str]) -> dict:
+async def batch_function_analysis(function_names: list[str]) -> dict:
     """
     批量分析多个函数
 
@@ -113,7 +114,7 @@ async def batch_function_analysis(function_names: List[str]) -> dict:
             "count": 3
         }
     """
-    if not ServerState.query_executor:
+    if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
     if len(function_names) > 10:
@@ -140,7 +141,7 @@ async def batch_function_analysis(function_names: List[str]) -> dict:
                ))
             '''
 
-            result = await ServerState.query_executor.execute(query)
+            result = await server_state.query_executor.execute(query)
 
             if result.get("success"):
                 import json

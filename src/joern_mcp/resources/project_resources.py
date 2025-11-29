@@ -1,7 +1,7 @@
 """项目资源暴露"""
 
-from typing import Dict, Any, List
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp, server_state
 
 
@@ -16,11 +16,11 @@ async def list_projects_resource() -> str:
     logger.info("Fetching projects resource")
 
     try:
-        if not ServerState.query_executor:
+        if not server_state.query_executor:
             return '{"success": false, "error": "Query executor not initialized"}'
 
         query = "workspace.projects.name.l"
-        result = await ServerState.query_executor.execute(query)
+        result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
             return result.get("stdout", "[]")
@@ -45,7 +45,7 @@ async def project_info_resource(project_name: str) -> str:
     logger.info(f"Fetching project info for: {project_name}")
 
     try:
-        if not ServerState.query_executor:
+        if not server_state.query_executor:
             return '{"success": false, "error": "Query executor not initialized"}'
 
         query = f'''
@@ -58,7 +58,7 @@ async def project_info_resource(project_name: str) -> str:
         ))
         '''
 
-        result = await ServerState.query_executor.execute(query)
+        result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
             return result.get("stdout", "{}")
@@ -83,10 +83,10 @@ async def project_functions_resource(project_name: str) -> str:
     logger.info(f"Fetching functions for project: {project_name}")
 
     try:
-        if not ServerState.query_executor:
+        if not server_state.query_executor:
             return '{"success": false, "error": "Query executor not initialized"}'
 
-        query = f"""
+        query = """
         cpg.method
            .filterNot(_.isExternal)
            .take(100)
@@ -99,7 +99,7 @@ async def project_functions_resource(project_name: str) -> str:
            ))
         """
 
-        result = await ServerState.query_executor.execute(query)
+        result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
             return result.get("stdout", "[]")
@@ -124,13 +124,13 @@ async def project_vulnerabilities_resource(project_name: str) -> str:
     logger.info(f"Fetching vulnerabilities for project: {project_name}")
 
     try:
-        if not ServerState.query_executor:
+        if not server_state.query_executor:
             return '{"success": false, "error": "Query executor not initialized"}'
 
         # 使用污点分析服务查找漏洞
         from joern_mcp.services.taint import TaintAnalysisService
 
-        service = TaintAnalysisService(ServerState.query_executor)
+        service = TaintAnalysisService(server_state.query_executor)
         result = await service.find_vulnerabilities(severity="CRITICAL", max_flows=5)
 
         if result.get("success"):

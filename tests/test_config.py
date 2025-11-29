@@ -1,7 +1,7 @@
 """测试配置管理"""
 
-import pytest
 from pathlib import Path
+
 from joern_mcp.config import Settings
 
 

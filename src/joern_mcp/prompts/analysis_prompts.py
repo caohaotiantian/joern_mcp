@@ -1,6 +1,7 @@
 """分析提示模板"""
 
 from loguru import logger
+
 from joern_mcp.mcp_server import mcp
 
 
@@ -398,8 +399,9 @@ async def batch_analysis_prompt(function_list: str = "main,init,process") -> str
 await batch_function_analysis({functions})
 
 # 批量执行查询
+# 示例：查询特定函数的代码
 queries = [
-    'cpg.method.name("{f}").code.l' for f in {functions}
+    'cpg.method.name("<function_name>").code.l'
 ]
 await batch_query(queries)
 ```

@@ -1,14 +1,15 @@
 """测试污点分析服务"""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from joern_mcp.services.taint import TaintAnalysisService
+
 from joern_mcp.models.taint_rules import (
-    TaintRule,
     VULNERABILITY_RULES,
     get_rule_by_name,
     list_all_rules,
 )
+from joern_mcp.services.taint import TaintAnalysisService
 
 
 def test_taint_rules():
