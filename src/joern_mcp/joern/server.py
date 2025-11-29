@@ -1,12 +1,14 @@
 """Joern Server管理"""
 
 import asyncio
-from typing import Optional, Tuple, Dict
+
 import httpx
-from loguru import logger
 from cpgqls_client import CPGQLSClient, import_code_query
+from loguru import logger
+
 from joern_mcp.config import settings
 from joern_mcp.joern.manager import JoernManager
+from joern_mcp.utils.port_utils import is_port_available
 
 
 class JoernServerError(Exception):
@@ -20,29 +22,36 @@ class JoernServerManager:
 
     def __init__(
         self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        joern_manager: Optional[JoernManager] = None,
+        host: str | None = None,
+        port: int | None = None,
+        joern_manager: JoernManager | None = None,
     ) -> None:
         self.host = host or settings.joern_server_host
         self.port = port or settings.joern_server_port
         self.endpoint = f"{self.host}:{self.port}"
         self.joern_manager = joern_manager or JoernManager()
 
-        self.process: Optional[asyncio.subprocess.Process] = None
-        self.client: Optional[CPGQLSClient] = None
-        self.auth_credentials: Optional[Tuple[str, str]] = None
+        self.process: asyncio.subprocess.Process | None = None
+        self.client: CPGQLSClient | None = None
+        self.auth_credentials: tuple[str, str] | None = None
 
     async def start(
         self,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
         timeout: int = 30,
     ) -> None:
         """启动Joern Server"""
         if self.process:
             logger.warning("Joern server already running")
             return
+
+        # 检查端口是否可用
+        if not is_port_available(self.port, self.host):
+            raise JoernServerError(
+                f"Port {self.port} is already in use. "
+                f"Please choose a different port or stop the process using this port."
+            )
 
         logger.info(f"Starting Joern server at {self.endpoint}")
 
@@ -91,26 +100,59 @@ class JoernServerManager:
         )
         logger.info("Joern client initialized")
 
+    def is_running(self) -> bool:
+        """检查服务器是否运行中"""
+        return self.process is not None and self.process.returncode is None
+
     async def _wait_for_ready(self, timeout: int = 30) -> None:
-        """等待服务器就绪"""
+        """等待服务器就绪
+
+        使用简单的TCP连接测试来检查端口是否可达
+        """
         logger.info(f"Waiting for server to be ready (timeout: {timeout}s)")
         start_time = asyncio.get_event_loop().time()
 
-        async with httpx.AsyncClient() as client:
-            while True:
-                try:
-                    response = await client.get(f"http://{self.endpoint}/", timeout=2.0)
-                    # 服务器返回任何响应都表示已启动
-                    if response.status_code in [200, 404]:
-                        return
-                except (httpx.ConnectError, httpx.TimeoutException):
-                    pass
-                except Exception as e:
-                    logger.debug(f"Waiting for server: {e}")
+        while True:
+            try:
+                # 尝试建立TCP连接来检查端口是否可达
+                import socket
+
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2.0)
+                result = sock.connect_ex((self.host, self.port))
+                sock.close()
+
+                if result == 0:
+                    # 端口可达，服务器已启动
+                    logger.info(f"Server port {self.port} is accepting connections")
+                    return
+            except Exception as e:
+                logger.debug(f"Waiting for server: {e}")
 
                 # 检查超时
                 elapsed = asyncio.get_event_loop().time() - start_time
                 if elapsed > timeout:
+                    # 获取进程输出用于调试
+                    if self.process:
+                        try:
+                            stdout_data = (
+                                await asyncio.wait_for(
+                                    self.process.stdout.read(1024), timeout=0.5
+                                )
+                                if self.process.stdout
+                                else b""
+                            )
+                            stderr_data = (
+                                await asyncio.wait_for(
+                                    self.process.stderr.read(1024), timeout=0.5
+                                )
+                                if self.process.stderr
+                                else b""
+                            )
+                            logger.error(f"Server stdout: {stdout_data.decode()}")
+                            logger.error(f"Server stderr: {stderr_data.decode()}")
+                        except:
+                            pass
                     raise TimeoutError(
                         f"Joern server failed to start within {timeout}s"
                     )
@@ -122,7 +164,7 @@ class JoernServerManager:
                     )
                     raise JoernServerError(f"Server process exited: {stderr.decode()}")
 
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)  # 增加等待间隔
 
     async def stop(self) -> None:
         """停止Joern Server"""
@@ -131,6 +173,7 @@ class JoernServerManager:
             return
 
         logger.info("Stopping Joern server")
+        saved_port = self.port
 
         try:
             self.process.terminate()
@@ -144,6 +187,18 @@ class JoernServerManager:
         finally:
             self.process = None
             self.client = None
+
+            # 等待端口释放
+            await asyncio.sleep(1)
+
+            # 验证端口已释放
+            if is_port_available(saved_port, self.host):
+                logger.success(f"Port {saved_port} released successfully")
+            else:
+                logger.warning(
+                    f"Port {saved_port} still in use after server stop. "
+                    f"It may take a few seconds to release."
+                )
 
     async def restart(self) -> None:
         """重启Joern Server"""
@@ -163,7 +218,7 @@ class JoernServerManager:
             logger.error(f"Health check failed: {e}")
             return False
 
-    def execute_query(self, query: str) -> Dict:
+    def execute_query(self, query: str) -> dict:
         """执行查询（同步）"""
         if not self.client:
             raise JoernServerError("Server not started")
@@ -176,8 +231,29 @@ class JoernServerManager:
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
             raise JoernServerError(f"Query failed: {e}")
+    
+    async def execute_query_async(self, query: str) -> dict:
+        """执行查询（异步）- 在已有event loop中使用"""
+        import concurrent.futures
+        
+        if not self.client:
+            raise JoernServerError("Server not started")
 
-    async def import_code(self, source_path: str, project_name: str) -> Dict:
+        logger.debug(f"Executing query (async): {query[:100]}...")
+        
+        # 在线程池中运行同步的execute_query
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            try:
+                result = await loop.run_in_executor(
+                    executor, self.execute_query, query
+                )
+                return result
+            except Exception as e:
+                logger.error(f"Async query execution failed: {e}")
+                raise JoernServerError(f"Query failed: {e}")
+
+    async def import_code(self, source_path: str, project_name: str) -> dict:
         """导入代码生成CPG"""
         logger.info(f"Importing code from {source_path} as {project_name}")
         query = import_code_query(source_path, project_name)

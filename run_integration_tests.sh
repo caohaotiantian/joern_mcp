@@ -12,9 +12,31 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# 清理函数
+cleanup_ports() {
+    echo -e "${BLUE}🧹 清理端口占用...${NC}"
+    
+    # 查找并终止Joern进程
+    if command -v pgrep &> /dev/null; then
+        JOERN_PIDS=$(pgrep -f "joern.*--server" || true)
+        if [ -n "$JOERN_PIDS" ]; then
+            echo -e "${YELLOW}⚠️  发现Joern Server进程: $JOERN_PIDS${NC}"
+            echo "$JOERN_PIDS" | xargs kill -9 2>/dev/null || true
+            echo -e "${GREEN}✅ Joern进程已清理${NC}"
+            sleep 2  # 等待端口释放
+        fi
+    fi
+}
+
 # 项目根目录
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
+
+# 设置trap捕获退出信号，确保清理
+trap cleanup_ports EXIT INT TERM
+
+# 在开始前清理端口
+cleanup_ports
 
 echo -e "${GREEN}🧪 Joern MCP Server - 集成测试${NC}"
 echo "======================================"
@@ -88,7 +110,7 @@ case "${1:-}" in
         ;;
     --quick|-q)
         echo -e "${GREEN}▶️  快速集成测试（跳过性能测试）${NC}"
-        TEST_MARKERS="-m 'integration and not performance and not stress'"
+        TEST_MARKERS='-m "integration and not performance and not stress"'
         ;;
     --help|-h)
         echo "使用方法: ./run_integration_tests.sh [选项]"
@@ -111,7 +133,7 @@ case "${1:-}" in
         ;;
     *)
         echo -e "${GREEN}▶️  快速集成测试（默认）${NC}"
-        TEST_MARKERS="-m 'integration and not performance and not stress'"
+        TEST_MARKERS='-m "integration and not performance and not stress"'
         ;;
 esac
 
@@ -119,8 +141,8 @@ echo ""
 echo -e "${YELLOW}运行测试...${NC}"
 echo "======================================"
 
-# 运行pytest
-if .venv/bin/python -m pytest tests/integration/ ${TEST_MARKERS} ${VERBOSE} --tb=short; then
+# 运行pytest  
+if eval ".venv/bin/python -m pytest tests/integration/ ${TEST_MARKERS} ${VERBOSE} --tb=short"; then
     echo ""
     echo -e "${GREEN}✅ 集成测试完成！${NC}"
 else

@@ -79,14 +79,23 @@ class QueryExecutor:
         # 4. 执行查询（并发控制）
         async with self.query_semaphore:
             try:
-                timeout = timeout or settings.query_timeout
-                result = await asyncio.wait_for(
-                    asyncio.to_thread(self.server_manager.execute_query, query),
-                    timeout=timeout,
-                )
+                timeout_val = timeout or settings.query_timeout
+
+                # 优先使用异步方法（避免event loop冲突）
+                if hasattr(self.server_manager, "execute_query_async"):
+                    result = await asyncio.wait_for(
+                        self.server_manager.execute_query_async(query),
+                        timeout=timeout_val,
+                    )
+                else:
+                    # 回退到同步方法（在线程中运行）
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(self.server_manager.execute_query, query),
+                        timeout=timeout_val,
+                    )
             except asyncio.TimeoutError:
-                logger.error(f"Query timeout after {timeout}s")
-                raise QueryExecutionError(f"Query timeout after {timeout}s")
+                logger.error(f"Query timeout after {timeout_val}s")
+                raise QueryExecutionError(f"Query timeout after {timeout_val}s")
             except Exception as e:
                 logger.error(f"Query execution failed: {e}")
                 raise QueryExecutionError(str(e))

@@ -34,7 +34,7 @@ class CallGraphService:
                 # 多层调用
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.caller)(_.times({depth}))
+                   .repeat(_.caller)({depth})
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -89,7 +89,7 @@ class CallGraphService:
             else:
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.callee)(_.times({depth}))
+                   .repeat(_.callee)({depth})
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,

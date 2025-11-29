@@ -111,6 +111,7 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
+    "--timeout=120",  # 每个测试最多120秒
 ]
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
@@ -120,6 +121,16 @@ markers = [
     "stress: marks tests as stress tests",
 ]
 asyncio_mode = "auto"
+filterwarnings = [
+    "error",
+    # 忽略CPGQLSClient内部的协程警告（库本身的问题）
+    "ignore::RuntimeWarning:asyncio.base_events",
+    "ignore:coroutine.*was never awaited:RuntimeWarning",
+    # 忽略ResourceWarning（由CPGQLSClient引起）
+    "ignore::ResourceWarning",
+    # 忽略DeprecationWarning
+    "ignore::DeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]

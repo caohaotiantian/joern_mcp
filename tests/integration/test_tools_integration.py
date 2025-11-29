@@ -57,12 +57,12 @@ class TestToolsIntegration:
         service = TaintAnalysisService(executor)
 
         # 列出规则
-        result = await service.list_rules()
+        result = service.list_rules()
         assert result.get("success") is True
         assert len(result.get("rules", [])) >= 6
 
         # 获取规则详情
-        result = await service.get_rule_details("Command Injection")
+        result = service.get_rule_details("Command Injection")
         assert result.get("success") is True
         assert result["rule"]["severity"] == "CRITICAL"
 
@@ -70,6 +70,7 @@ class TestToolsIntegration:
     async def test_concurrent_service_calls(self, joern_server):
         """测试并发服务调用"""
         import asyncio
+        import warnings
 
         executor = QueryExecutor(joern_server)
         callgraph_service = CallGraphService(executor)
@@ -82,7 +83,10 @@ class TestToolsIntegration:
             dataflow_service.track_dataflow("gets", "system", max_flows=5),
         ]
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 使用warnings过滤器抑制CPGQLSClient的协程警告
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning, module="asyncio")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 验证至少大部分成功
         success_count = sum(1 for r in results if isinstance(r, dict) and r is not None)

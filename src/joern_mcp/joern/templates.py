@@ -56,7 +56,7 @@ class QueryTemplates:
 
     GET_CALL_CHAIN = Template("""
         cpg.method.name("$name")
-           .repeat(_.caller)(_.times($depth))
+           .repeat(_.caller)($depth)
            .dedup
            .map(m => Map(
                "name" -> m.name,
