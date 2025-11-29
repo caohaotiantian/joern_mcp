@@ -1,65 +1,43 @@
-"""Pytest配置和共享fixtures"""
-
+"""
+共享测试fixtures和utilities
+"""
 import pytest
-import asyncio
-from pathlib import Path
-from typing import AsyncGenerator
 from unittest.mock import MagicMock, AsyncMock
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """创建事件循环"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture
-def tmp_project_dir(tmp_path: Path) -> Path:
-    """创建临时项目目录"""
-    project_dir = tmp_path / "test_project"
-    project_dir.mkdir()
-
-    # 创建一个简单的C文件
-    (project_dir / "main.c").write_text("int main() { return 0; }")
-
-    return project_dir
-
-
-@pytest.fixture
-def mock_joern_manager():
-    """Mock JoernManager"""
-    manager = MagicMock()
-    manager.joern_path = Path("/usr/local/bin/joern")
-    manager.get_version.return_value = "2.0.1"
-    manager.validate_installation.return_value = {
-        "joern_found": True,
-        "joern_executable": True,
-        "version_retrieved": True,
-    }
-    return manager
 
 
 @pytest.fixture
 def mock_joern_server():
-    """Mock JoernServerManager"""
+    """Mock Joern Server Manager"""
     server = MagicMock()
-    server.endpoint = "localhost:8080"
-    server.execute_query.return_value = {
-        "success": True,
-        "stdout": '["result"]',
-        "stderr": "",
-    }
+    server.execute_query.return_value = {"success": True, "stdout": '[]'}
+    server.execute_query_async = AsyncMock(return_value={"success": True, "stdout": '[]'})
+    server.is_running.return_value = True
     return server
 
 
 @pytest.fixture
-async def mock_async_server():
-    """Mock async JoernServerManager"""
-    server = MagicMock()
-    server.start = AsyncMock()
-    server.stop = AsyncMock()
-    server.health_check = AsyncMock(return_value=True)
-    server.execute_query.return_value = {"success": True, "stdout": '["result"]'}
-    return server
+def mock_query_executor(mock_joern_server):
+    """Mock Query Executor"""
+    from joern_mcp.joern.executor import QueryExecutor
+    
+    executor = QueryExecutor(mock_joern_server)
+    return executor
+
+
+@pytest.fixture
+def sample_query_result():
+    """示例查询结果"""
+    return {
+        "success": True,
+        "stdout": '[{"name": "main", "filename": "test.c", "lineNumber": 10}]'
+    }
+
+
+@pytest.fixture
+def sample_function_code():
+    """示例函数代码"""
+    return """
+void main() {
+    printf("Hello, World!");
+}
+"""

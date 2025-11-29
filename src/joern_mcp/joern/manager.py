@@ -80,12 +80,18 @@ class JoernManager:
 
             # 解析版本号
             output = result.stdout.strip()
-            # 版本号通常在输出中，格式如 "Joern 2.0.1" 或 "2.0.1"
-            version_line = output.split("\n")[0]
             # 提取版本号
             import re
 
-            match = re.search(r"(\d+\.\d+\.\d+)", version_line)
+            # 尝试匹配标准版本格式（如1.2.3）- 在整个输出中搜索
+            match = re.search(r"(\d+\.\d+\.\d+)", output)
+            if match:
+                self.version = match.group(1)
+                logger.info(f"Joern version: {self.version}")
+                return self.version
+            
+            # 尝试匹配HEAD+日期格式（如HEAD+20251127-0814）- 在整个输出中搜索
+            match = re.search(r"(HEAD\+\d{8}-\d{4})", output)
             if match:
                 self.version = match.group(1)
                 logger.info(f"Joern version: {self.version}")
