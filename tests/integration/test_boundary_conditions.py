@@ -7,7 +7,7 @@ from joern_mcp.joern.executor_optimized import OptimizedQueryExecutor as QueryEx
 from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.dataflow import DataFlowService
 from joern_mcp.services.taint import TaintAnalysisService
-from tests.e2e.test_helpers import execute_query_safe, import_code_safe
+from tests.e2e.test_helpers import import_code_safe
 
 
 @pytest.mark.integration

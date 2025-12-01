@@ -282,7 +282,7 @@ class JoernServerManager:
         """导入代码生成CPG"""
         logger.info(f"Importing code from {source_path} as {project_name}")
         query = import_code_query(source_path, project_name)
-        
+
         # 使用异步方法（兼容HTTP和cpgqls-client）
         result = await self.execute_query_async(query)
 

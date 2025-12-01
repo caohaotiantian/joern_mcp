@@ -75,13 +75,13 @@ class JoernHTTPClient:
             # 1. 建立WebSocket连接
             connect_endpoint = self._connect_endpoint()
             logger.debug(f"连接WebSocket: {connect_endpoint}")
-            
+
             async with websockets.connect(connect_endpoint, ping_interval=None) as ws_conn:
                 logger.debug("WebSocket连接成功，等待确认消息...")
                 # 等待连接确认消息
                 connected_msg = await ws_conn.recv()
                 logger.debug(f"收到消息: {connected_msg}")
-                
+
                 if connected_msg != self.CPGQLS_MSG_CONNECTED:
                     raise Exception(
                         f"Unexpected first message on websocket: {connected_msg}"
@@ -91,7 +91,7 @@ class JoernHTTPClient:
                 # 2. POST查询（使用同步requests，与cpgqls-client一致）
                 post_endpoint = self._post_query_endpoint()
                 logger.debug(f"POST查询到: {post_endpoint}")
-                
+
                 post_res = requests.post(
                     post_endpoint,
                     json={"query": query},
@@ -120,7 +120,7 @@ class JoernHTTPClient:
                 # 4. GET查询结果（同步requests）
                 result_endpoint = self._get_result_endpoint(query_uuid)
                 logger.debug(f"GET结果从: {result_endpoint}")
-                
+
                 get_res = requests.get(
                     result_endpoint,
                     auth=self.auth,

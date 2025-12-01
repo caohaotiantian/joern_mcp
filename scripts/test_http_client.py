@@ -72,7 +72,6 @@ async def test_raw_http_client():
     logger.info(f"使用端口: {port}")
 
     # 手动启动Joern Server
-    import subprocess
 
     manager = JoernManager()
     cmd = [
@@ -93,7 +92,7 @@ async def test_raw_http_client():
         # 等待server启动
         logger.info("⏳ 等待Server启动...")
         await asyncio.sleep(30)  # 增加到30秒
-        
+
         # 检查进程状态
         if process.returncode is not None:
             logger.error(f"❌ Server进程已退出，返回码: {process.returncode}")
@@ -101,7 +100,7 @@ async def test_raw_http_client():
             logger.error(f"STDOUT: {stdout.decode() if stdout else 'N/A'}")
             logger.error(f"STDERR: {stderr.decode() if stderr else 'N/A'}")
             return
-        
+
         logger.info(f"✅ Server进程运行中 (PID: {process.pid})")
 
         # 创建HTTP客户端
