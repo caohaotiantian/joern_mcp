@@ -30,39 +30,53 @@ class DataFlowService:
         logger.info(f"Tracking dataflow from {source_method} to {sink_method}")
 
         try:
-            # 使用正确的Joern查询语法（不使用def关键字）
+            # 使用代码块包裹val定义，避免表达式中的语法错误
             query = f'''
-            val source = cpg.method.name("{source_method}").parameter
-            val sink = cpg.call.name("{sink_method}").argument
+            {{
+              val source = cpg.method.name("{source_method}").parameter
+              val sink = cpg.call.name("{sink_method}").argument
 
-            sink.reachableBy(source).flows.take({max_flows}).map(flow => Map(
-                "source" -> Map(
-                    "code" -> flow.source.code,
-                    "method" -> flow.source.method.name,
-                    "file" -> flow.source.file.name.headOption.getOrElse("unknown"),
-                    "line" -> flow.source.lineNumber.getOrElse(-1)
-                ),
-                "sink" -> Map(
-                    "code" -> flow.sink.code,
-                    "method" -> flow.sink.method.name,
-                    "file" -> flow.sink.file.name.headOption.getOrElse("unknown"),
-                    "line" -> flow.sink.lineNumber.getOrElse(-1)
-                ),
-                "pathLength" -> flow.elements.size,
-                "path" -> flow.elements.take(20).map(e => Map(
-                    "type" -> e.label,
-                    "code" -> e.code,
-                    "line" -> e.lineNumber.getOrElse(-1)
-                ))
-            ))
+              sink.reachableByFlows(source).take({max_flows}).map {{ path =>
+                val sourceNode = path.elements.head
+                val sinkNode = path.elements.last
+                Map(
+                  "source" -> Map(
+                      "code" -> sourceNode.code,
+                      "file" -> sourceNode.file.name.headOption.getOrElse("unknown"),
+                      "line" -> sourceNode.lineNumber.getOrElse(-1)
+                  ),
+                  "sink" -> Map(
+                      "code" -> sinkNode.code,
+                      "file" -> sinkNode.file.name.headOption.getOrElse("unknown"),
+                      "line" -> sinkNode.lineNumber.getOrElse(-1)
+                  ),
+                  "pathLength" -> path.elements.size,
+                  "path" -> path.elements.take(20).map(e => Map(
+                      "type" -> e.label,
+                      "code" -> e.code,
+                      "line" -> e.lineNumber.getOrElse(-1)
+                  ))
+                )
+              }}
+            }}
             '''
 
             result = await self.executor.execute(query)
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    flows = json.loads(stdout)
+                    # 尝试直接解析JSON
+                    flows = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(flows, str):
+                        flows = json.loads(flows)
                     return {
                         "success": True,
                         "source_method": source_method,
@@ -77,6 +91,30 @@ class DataFlowService:
                         else (1 if flows else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            flows = json.loads(json_str)
+                            if isinstance(flows, str):
+                                flows = json.loads(flows)
+                            return {
+                                "success": True,
+                                "source_method": source_method,
+                                "sink_method": sink_method,
+                                "flows": flows
+                                if isinstance(flows, list)
+                                else [flows]
+                                if flows
+                                else [],
+                                "count": len(flows)
+                                if isinstance(flows, list)
+                                else (1 if flows else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
                     return {
                         "success": True,
                         "source_method": source_method,
@@ -108,26 +146,30 @@ class DataFlowService:
 
         try:
             if sink_method:
-                # 追踪到特定汇
+                # 追踪到特定汇（使用代码块避免val/def在表达式中的问题）
                 query = f'''
-                val source = cpg.identifier.name("{variable_name}")
-                val sink = cpg.call.name("{sink_method}").argument
+                {{
+                  val source = cpg.identifier.name("{variable_name}")
+                  val sink = cpg.call.name("{sink_method}").argument
 
-                sink.reachableBy(source).flows.take({max_flows}).map(flow => Map(
-                    "variable" -> "{variable_name}",
-                    "source" -> Map(
-                        "code" -> flow.source.code,
-                        "file" -> flow.source.file.name.headOption.getOrElse("unknown"),
-                        "line" -> flow.source.lineNumber.getOrElse(-1)
-                    ),
-                    "sink" -> Map(
-                        "code" -> flow.sink.code,
-                        "method" -> "{sink_method}",
-                        "file" -> flow.sink.file.name.headOption.getOrElse("unknown"),
-                        "line" -> flow.sink.lineNumber.getOrElse(-1)
-                    ),
-                    "pathLength" -> flow.elements.size
-                ))
+                  sink.reachableByFlows(source).take({max_flows}).map {{ path =>
+                    Map(
+                      "variable" -> "{variable_name}",
+                      "source" -> Map(
+                          "code" -> path.elements.head.code,
+                          "file" -> path.elements.head.file.name.headOption.getOrElse("unknown"),
+                          "line" -> path.elements.head.lineNumber.getOrElse(-1)
+                      ),
+                      "sink" -> Map(
+                          "code" -> path.elements.last.code,
+                          "method" -> "{sink_method}",
+                          "file" -> path.elements.last.file.name.headOption.getOrElse("unknown"),
+                          "line" -> path.elements.last.lineNumber.getOrElse(-1)
+                      ),
+                      "pathLength" -> path.elements.size
+                    )
+                  }}
+                }}
                 '''
             else:
                 # 查找所有使用该变量的地方
@@ -148,8 +190,18 @@ class DataFlowService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    flows = json.loads(stdout)
+                    # 尝试直接解析JSON
+                    flows = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(flows, str):
+                        flows = json.loads(flows)
                     return {
                         "success": True,
                         "variable": variable_name,
@@ -164,6 +216,31 @@ class DataFlowService:
                         else (1 if flows else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            flows = json.loads(json_str)
+                            # 双重解码
+                            if isinstance(flows, str):
+                                flows = json.loads(flows)
+                            return {
+                                "success": True,
+                                "variable": variable_name,
+                                "sink_method": sink_method,
+                                "flows": flows
+                                if isinstance(flows, list)
+                                else [flows]
+                                if flows
+                                else [],
+                                "count": len(flows)
+                                if isinstance(flows, list)
+                                else (1 if flows else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
                     return {
                         "success": True,
                         "variable": variable_name,
@@ -209,7 +286,7 @@ class DataFlowService:
                 query = f'''
                 cpg.method.name("{function_name}")
                    .ast.isIdentifier
-                   .dedup.by(_.name)
+                   .dedupBy(_.name)
                    .take(50)
                    .map(i => Map(
                        "variable" -> i.name,
@@ -224,8 +301,18 @@ class DataFlowService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    dependencies = json.loads(stdout)
+                    # 尝试直接解析JSON
+                    dependencies = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(dependencies, str):
+                        dependencies = json.loads(dependencies)
                     return {
                         "success": True,
                         "function": function_name,
@@ -240,6 +327,30 @@ class DataFlowService:
                         else (1 if dependencies else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            dependencies = json.loads(json_str)
+                            if isinstance(dependencies, str):
+                                dependencies = json.loads(dependencies)
+                            return {
+                                "success": True,
+                                "function": function_name,
+                                "variable": variable_name,
+                                "dependencies": dependencies
+                                if isinstance(dependencies, list)
+                                else [dependencies]
+                                if dependencies
+                                else [],
+                                "count": len(dependencies)
+                                if isinstance(dependencies, list)
+                                else (1 if dependencies else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
                     return {
                         "success": True,
                         "function": function_name,

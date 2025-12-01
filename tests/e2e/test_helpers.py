@@ -32,7 +32,7 @@ async def run_sync_in_executor(func: Callable, *args, **kwargs) -> Any:
 
 
 async def import_code_safe(joern_server, code_path: str, project_name: str) -> dict:
-    """安全地导入代码，避免event loop冲突
+    """安全地导入代码（支持HTTP和cpgqls客户端）
 
     Args:
         joern_server: JoernServerManager实例
@@ -47,14 +47,14 @@ async def import_code_safe(joern_server, code_path: str, project_name: str) -> d
     # 构建查询
     query = import_code_query(code_path, project_name)
 
-    # 在线程池中执行同步查询
-    result = await run_sync_in_executor(joern_server.execute_query, query)
+    # 使用异步方法（HTTP客户端已原生支持异步）
+    result = await joern_server.execute_query_async(query)
 
     return result
 
 
 async def execute_query_safe(joern_server, query: str) -> dict:
-    """安全地执行查询，避免event loop冲突
+    """安全地执行查询（支持HTTP和cpgqls客户端）
 
     Args:
         joern_server: JoernServerManager实例
@@ -63,7 +63,8 @@ async def execute_query_safe(joern_server, query: str) -> dict:
     Returns:
         查询结果字典
     """
-    result = await run_sync_in_executor(joern_server.execute_query, query)
+    # 使用异步方法（HTTP客户端已原生支持异步）
+    result = await joern_server.execute_query_async(query)
 
     return result
 

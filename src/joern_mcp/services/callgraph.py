@@ -32,10 +32,10 @@ class CallGraphService:
                 # 使用预定义模板
                 query = QueryTemplates.build("GET_CALLERS", name=function_name)
             else:
-                # 多层调用
+                # 多层调用（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.caller)({depth})
+                   .repeat(_.caller)(_.maxDepth({depth}))
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -88,9 +88,10 @@ class CallGraphService:
             if depth == 1:
                 query = QueryTemplates.build("GET_CALLEES", name=function_name)
             else:
+                # 多层调用（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.callee)({depth})
+                   .repeat(_.callee)(_.maxDepth({depth}))
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -146,10 +147,10 @@ class CallGraphService:
 
         try:
             if direction == "up":
-                # 向上追踪调用者（使用正确的repeat语法）
+                # 向上追踪调用者（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.caller)({max_depth})
+                   .repeat(_.caller)(_.maxDepth({max_depth}))
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -158,10 +159,10 @@ class CallGraphService:
                    ))
                 '''
             else:
-                # 向下追踪被调用者（使用正确的repeat语法）
+                # 向下追踪被调用者（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.callee)({max_depth})
+                   .repeat(_.callee)(_.maxDepth({max_depth}))
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -174,8 +175,18 @@ class CallGraphService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    chain = json.loads(stdout)
+                    # 尝试直接解析JSON
+                    chain = json.loads(clean_output)
+                    # 如果chain是字符串（双重JSON编码），再解析一次
+                    if isinstance(chain, str):
+                        chain = json.loads(chain)
                     return {
                         "success": True,
                         "function": function_name,
@@ -185,6 +196,26 @@ class CallGraphService:
                         "count": len(chain) if isinstance(chain, list) else 1,
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON: val res1: String = "[]"
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            chain = json.loads(json_str)
+                            # 双重解码
+                            if isinstance(chain, str):
+                                chain = json.loads(chain)
+                            return {
+                                "success": True,
+                                "function": function_name,
+                                "direction": direction,
+                                "max_depth": max_depth,
+                                "chain": chain if isinstance(chain, list) else [chain],
+                                "count": len(chain) if isinstance(chain, list) else 1,
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
                     return {
                         "success": True,
                         "function": function_name,

@@ -6,6 +6,7 @@ from cpgqls_client import CPGQLSClient, import_code_query
 from loguru import logger
 
 from joern_mcp.config import settings
+from joern_mcp.joern.http_client import JoernHTTPClient
 from joern_mcp.joern.manager import JoernManager
 from joern_mcp.utils.port_utils import is_port_available
 
@@ -24,14 +25,16 @@ class JoernServerManager:
         host: str | None = None,
         port: int | None = None,
         joern_manager: JoernManager | None = None,
+        use_http_client: bool = False,  # 新增：默认使用cpgqls保持兼容性
     ) -> None:
         self.host = host or settings.joern_server_host
         self.port = port or settings.joern_server_port
         self.endpoint = f"{self.host}:{self.port}"
         self.joern_manager = joern_manager or JoernManager()
+        self.use_http_client = use_http_client  # 选择客户端类型
 
         self.process: asyncio.subprocess.Process | None = None
-        self.client: CPGQLSClient | None = None
+        self.client: CPGQLSClient | JoernHTTPClient | None = None
         self.auth_credentials: tuple[str, str] | None = None
 
     async def start(
@@ -93,11 +96,19 @@ class JoernServerManager:
             await self.stop()
             raise e
 
-        # 初始化客户端
-        self.client = CPGQLSClient(
-            self.endpoint, auth_credentials=self.auth_credentials
-        )
-        logger.info("Joern client initialized")
+        # 初始化客户端（HTTP或cpgqls-client）
+        if self.use_http_client:
+            self.client = JoernHTTPClient(
+                endpoint=self.endpoint,
+                auth=self.auth_credentials,
+                timeout=settings.query_timeout,
+            )
+            logger.info("Joern HTTP client initialized")
+        else:
+            self.client = CPGQLSClient(
+                self.endpoint, auth_credentials=self.auth_credentials
+            )
+            logger.info("Joern cpgqls client initialized")
 
     def is_running(self) -> bool:
         """检查服务器是否运行中"""
@@ -220,9 +231,15 @@ class JoernServerManager:
             return False
 
     def execute_query(self, query: str) -> dict:
-        """执行查询（同步）"""
+        """执行查询（同步）- 仅用于cpgqls-client"""
         if not self.client:
             raise JoernServerError("Server not started") from None
+
+        # HTTP客户端不支持同步调用
+        if isinstance(self.client, JoernHTTPClient):
+            raise JoernServerError(
+                "HTTP client requires async execution. Use execute_query_async() instead."
+            )
 
         logger.debug(f"Executing query: {query[:100]}...")
         try:
@@ -235,22 +252,31 @@ class JoernServerManager:
 
     async def execute_query_async(self, query: str) -> dict:
         """执行查询（异步）- 在已有event loop中使用"""
-        import concurrent.futures
-
         if not self.client:
             raise JoernServerError("Server not started") from None
 
         logger.debug(f"Executing query (async): {query[:100]}...")
 
-        # 在线程池中运行同步的execute_query
-        loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        # 如果是HTTP客户端，直接异步调用
+        if isinstance(self.client, JoernHTTPClient):
             try:
-                result = await loop.run_in_executor(executor, self.execute_query, query)
+                result = await self.client.execute(query)
                 return result
             except Exception as e:
-                logger.error(f"Async query execution failed: {e}")
+                logger.error(f"HTTP query execution failed: {e}")
                 raise JoernServerError(f"Query failed: {e}") from None
+        else:
+            # cpgqls-client需要在线程池中运行
+            import concurrent.futures
+
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                try:
+                    result = await loop.run_in_executor(executor, self.execute_query, query)
+                    return result
+                except Exception as e:
+                    logger.error(f"Async query execution failed: {e}")
+                    raise JoernServerError(f"Query failed: {e}") from None
 
     async def import_code(self, source_path: str, project_name: str) -> dict:
         """导入代码生成CPG"""

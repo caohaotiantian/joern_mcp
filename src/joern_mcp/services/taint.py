@@ -39,36 +39,50 @@ class TaintAnalysisService:
             sink_pattern = "|".join(rule.sinks)
 
             query = f'''
-            val sources = cpg.method.name("({source_pattern})").parameter
-            val sinks = cpg.call.name("({sink_pattern})").argument
+            {{
+              val sources = cpg.method.name("({source_pattern})").parameter
+              val sinks = cpg.call.name("({sink_pattern})").argument
 
-            sinks.reachableBy(sources).flows.take({max_flows}).map(flow => Map(
-                "vulnerability" -> "{rule.name}",
-                "severity" -> "{rule.severity}",
-                "cwe_id" -> "{rule.cwe_id}",
-                "description" -> "{rule.description}",
-                "source" -> Map(
-                    "code" -> flow.source.code,
-                    "method" -> flow.source.method.name,
-                    "file" -> flow.source.file.name.headOption.getOrElse("unknown"),
-                    "line" -> flow.source.lineNumber.getOrElse(-1)
-                ),
-                "sink" -> Map(
-                    "code" -> flow.sink.code,
-                    "method" -> flow.sink.method.name,
-                    "file" -> flow.sink.file.name.headOption.getOrElse("unknown"),
-                    "line" -> flow.sink.lineNumber.getOrElse(-1)
-                ),
-                "pathLength" -> flow.elements.size
-            ))
+              sinks.reachableByFlows(sources).take({max_flows}).map {{ path =>
+                val sourceNode = path.elements.head
+                val sinkNode = path.elements.last
+                Map(
+                  "vulnerability" -> "{rule.name}",
+                  "severity" -> "{rule.severity}",
+                  "cwe_id" -> "{rule.cwe_id}",
+                  "description" -> "{rule.description}",
+                  "source" -> Map(
+                      "code" -> sourceNode.code,
+                      "file" -> sourceNode.file.name.headOption.getOrElse("unknown"),
+                      "line" -> sourceNode.lineNumber.getOrElse(-1)
+                  ),
+                  "sink" -> Map(
+                      "code" -> sinkNode.code,
+                      "file" -> sinkNode.file.name.headOption.getOrElse("unknown"),
+                      "line" -> sinkNode.lineNumber.getOrElse(-1)
+                  ),
+                  "pathLength" -> path.elements.size
+                )
+              }}
+            }}
             '''
 
             result = await self.executor.execute(query)
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    flows = json.loads(stdout)
+                    # 尝试直接解析JSON
+                    flows = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(flows, str):
+                        flows = json.loads(flows)
                     return {
                         "success": True,
                         "rule": rule.name,
@@ -84,6 +98,31 @@ class TaintAnalysisService:
                         else (1 if flows else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            flows = json.loads(json_str)
+                            if isinstance(flows, str):
+                                flows = json.loads(flows)
+                            return {
+                                "success": True,
+                                "rule": rule.name,
+                                "severity": rule.severity,
+                                "cwe_id": rule.cwe_id,
+                                "vulnerabilities": flows
+                                if isinstance(flows, list)
+                                else [flows]
+                                if flows
+                                else [],
+                                "count": len(flows)
+                                if isinstance(flows, list)
+                                else (1 if flows else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
                     return {"success": True, "rule": rule.name, "raw_output": stdout}
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
@@ -164,37 +203,51 @@ class TaintAnalysisService:
 
         try:
             query = f"""
-            val sources = cpg.method.name("({source_pattern})").parameter
-            val sinks = cpg.call.name("({sink_pattern})").argument
+            {{
+              val sources = cpg.method.name("({source_pattern})").parameter
+              val sinks = cpg.call.name("({sink_pattern})").argument
 
-            sinks.reachableBy(sources).flows.take({max_flows}).map(flow => Map(
-                "source" -> Map(
-                    "code" -> flow.source.code,
-                    "method" -> flow.source.method.name,
-                    "file" -> flow.source.file.name.headOption.getOrElse("unknown"),
-                    "line" -> flow.source.lineNumber.getOrElse(-1)
-                ),
-                "sink" -> Map(
-                    "code" -> flow.sink.code,
-                    "method" -> flow.sink.method.name,
-                    "file" -> flow.sink.file.name.headOption.getOrElse("unknown"),
-                    "line" -> flow.sink.lineNumber.getOrElse(-1)
-                ),
-                "pathLength" -> flow.elements.size,
-                "path" -> flow.elements.take(20).map(e => Map(
-                    "type" -> e.label,
-                    "code" -> e.code,
-                    "line" -> e.lineNumber.getOrElse(-1)
-                ))
-            ))
+              sinks.reachableByFlows(sources).take({max_flows}).map {{ path =>
+                val sourceNode = path.elements.head
+                val sinkNode = path.elements.last
+                Map(
+                  "source" -> Map(
+                      "code" -> sourceNode.code,
+                      "file" -> sourceNode.file.name.headOption.getOrElse("unknown"),
+                      "line" -> sourceNode.lineNumber.getOrElse(-1)
+                  ),
+                  "sink" -> Map(
+                      "code" -> sinkNode.code,
+                      "file" -> sinkNode.file.name.headOption.getOrElse("unknown"),
+                      "line" -> sinkNode.lineNumber.getOrElse(-1)
+                  ),
+                  "pathLength" -> path.elements.size,
+                  "path" -> path.elements.take(20).map(e => Map(
+                      "type" -> e.label,
+                      "code" -> e.code,
+                      "line" -> e.lineNumber.getOrElse(-1)
+                  ))
+                )
+              }}
+            }}
             """
 
             result = await self.executor.execute(query)
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    flows = json.loads(stdout)
+                    # 尝试直接解析JSON
+                    flows = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(flows, str):
+                        flows = json.loads(flows)
                     return {
                         "success": True,
                         "source_pattern": source_pattern,
@@ -209,6 +262,30 @@ class TaintAnalysisService:
                         else (1 if flows else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            flows = json.loads(json_str)
+                            if isinstance(flows, str):
+                                flows = json.loads(flows)
+                            return {
+                                "success": True,
+                                "source_pattern": source_pattern,
+                                "sink_pattern": sink_pattern,
+                                "flows": flows
+                                if isinstance(flows, list)
+                                else [flows]
+                                if flows
+                                else [],
+                                "count": len(flows)
+                                if isinstance(flows, list)
+                                else (1 if flows else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
                     return {"success": True, "raw_output": stdout}
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}

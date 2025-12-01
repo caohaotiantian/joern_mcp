@@ -168,7 +168,8 @@ async def joern_server(event_loop):
             port = find_free_port()
             logger.info(f"🔧 Attempt {attempt + 1}/{max_retries}: Using port {port}")
 
-            server = JoernServerManager(host="localhost", port=port)
+            # 默认使用cpgqls客户端以保持兼容性
+            server = JoernServerManager(host="localhost", port=port, use_http_client=False)
 
             # 尝试启动服务器（增加超时到180秒）
             logger.info("⏳ Starting Joern Server (this may take 1-3 minutes)...")
