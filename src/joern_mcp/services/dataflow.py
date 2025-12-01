@@ -30,9 +30,10 @@ class DataFlowService:
         logger.info(f"Tracking dataflow from {source_method} to {sink_method}")
 
         try:
+            # 使用正确的Joern查询语法（不使用def关键字）
             query = f'''
-            def source = cpg.method.name("{source_method}").parameter
-            def sink = cpg.call.name("{sink_method}").argument
+            val source = cpg.method.name("{source_method}").parameter
+            val sink = cpg.call.name("{sink_method}").argument
 
             sink.reachableBy(source).flows.take({max_flows}).map(flow => Map(
                 "source" -> Map(
@@ -109,8 +110,8 @@ class DataFlowService:
             if sink_method:
                 # 追踪到特定汇
                 query = f'''
-                def source = cpg.identifier.name("{variable_name}")
-                def sink = cpg.call.name("{sink_method}").argument
+                val source = cpg.identifier.name("{variable_name}")
+                val sink = cpg.call.name("{sink_method}").argument
 
                 sink.reachableBy(source).flows.take({max_flows}).map(flow => Map(
                     "variable" -> "{variable_name}",

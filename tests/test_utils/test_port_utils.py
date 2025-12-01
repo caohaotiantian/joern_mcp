@@ -127,3 +127,63 @@ class TestPortUtilsEdgeCases:
         # 所有操作都应该成功
         assert len(results) == 5
         assert all(isinstance(r, bool) for r in results)
+
+
+class TestPortUtilsExtended:
+    """扩展的端口工具测试"""
+
+    def test_find_free_port_default_range(self):
+        """测试默认范围查找端口"""
+        port = find_free_port()
+        # 默认应该在1024-65535范围内
+        assert 1024 <= port <= 65535
+
+    def test_is_port_available_both_true_and_false(self):
+        """测试端口可用性检测的两种情况"""
+        # 找一个空闲端口
+        free_port = find_free_port(start_port=51000, end_port=51100)
+        assert is_port_available(free_port)
+
+        # 占用一个端口
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("localhost", 0))
+            sock.listen(1)
+            used_port = sock.getsockname()[1]
+            assert not is_port_available(used_port)
+        finally:
+            sock.close()
+
+    def test_is_port_in_use_both_cases(self):
+        """测试端口使用检测的两种情况"""
+        # 未使用的端口
+        free_port = find_free_port(start_port=51100, end_port=51200)
+        assert not is_port_in_use(free_port)
+
+        # 使用中的端口
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("localhost", 0))
+            sock.listen(1)
+            used_port = sock.getsockname()[1]
+            assert is_port_in_use(used_port)
+        finally:
+            sock.close()
+
+    def test_find_free_port_narrow_range(self):
+        """测试在狭窄范围内查找端口"""
+        # 小范围内应该也能找到端口
+        port = find_free_port(start_port=52000, end_port=52010)
+        assert 52000 <= port <= 52010
+
+    def test_port_operations_with_different_hosts(self):
+        """测试不同主机的端口操作"""
+        port = find_free_port()
+
+        # 测试localhost
+        result1 = is_port_available(port, host="localhost")
+        assert isinstance(result1, bool)
+
+        # 测试127.0.0.1
+        result2 = is_port_available(port, host="127.0.0.1")
+        assert isinstance(result2, bool)

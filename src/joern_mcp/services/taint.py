@@ -39,8 +39,8 @@ class TaintAnalysisService:
             sink_pattern = "|".join(rule.sinks)
 
             query = f'''
-            def sources = cpg.method.name("({source_pattern})").parameter
-            def sinks = cpg.call.name("({sink_pattern})").argument
+            val sources = cpg.method.name("({source_pattern})").parameter
+            val sinks = cpg.call.name("({sink_pattern})").argument
 
             sinks.reachableBy(sources).flows.take({max_flows}).map(flow => Map(
                 "vulnerability" -> "{rule.name}",
@@ -164,8 +164,8 @@ class TaintAnalysisService:
 
         try:
             query = f"""
-            def sources = cpg.method.name("({source_pattern})").parameter
-            def sinks = cpg.call.name("({sink_pattern})").argument
+            val sources = cpg.method.name("({source_pattern})").parameter
+            val sinks = cpg.call.name("({sink_pattern})").argument
 
             sinks.reachableBy(sources).flows.take({max_flows}).map(flow => Map(
                 "source" -> Map(

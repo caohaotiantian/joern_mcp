@@ -2,7 +2,7 @@
 
 import shutil
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -114,3 +114,99 @@ def test_validate_installation_structure():
     except JoernNotFoundError:
         # 如果Joern未安装，跳过测试
         pytest.skip("Joern not installed")
+
+
+def test_detect_from_env(monkeypatch):
+    """测试从环境变量检测Joern"""
+    from joern_mcp import config
+
+    with patch("shutil.which", return_value=None):
+        monkeypatch.setenv("JOERN_HOME", "/test/joern")
+        monkeypatch.setattr(config.settings, "joern_home", None)
+
+        with patch.object(Path, "exists", return_value=True):
+            manager = JoernManager()
+            assert manager.joern_path is not None
+
+
+def test_get_version_with_mock():
+    """测试获取版本（Mock）"""
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+    ):
+        manager = JoernManager()
+
+        # Mock subprocess.run返回版本信息
+        mock_result = MagicMock()
+        mock_result.stdout = "Joern 2.0.0\n"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            version = manager.get_version()
+            assert version == "2.0.0"
+
+
+def test_get_version_with_head_format():
+    """测试获取HEAD格式版本"""
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+    ):
+        manager = JoernManager()
+
+        mock_result = MagicMock()
+        mock_result.stdout = "Joern HEAD+20240101-1200\n"
+        mock_result.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_result):
+            version = manager.get_version()
+            assert "HEAD+" in version
+
+
+def test_ensure_directories_creates_paths(tmp_path, monkeypatch):
+    """测试ensure_directories创建路径"""
+    from joern_mcp import config
+
+    workspace = tmp_path / "new_workspace"
+    cpg_cache = tmp_path / "new_cache"
+
+    # 初始不存在
+    assert not workspace.exists()
+    assert not cpg_cache.exists()
+
+    monkeypatch.setattr(config.settings, "joern_workspace", workspace)
+    monkeypatch.setattr(config.settings, "joern_cpg_cache", cpg_cache)
+
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+    ):
+        manager = JoernManager()
+        manager.ensure_directories()
+
+    # 现在应该存在
+    assert workspace.exists()
+    assert cpg_cache.exists()
+
+
+def test_joern_path_resolution_priority():
+    """测试Joern路径解析优先级"""
+
+    # 1. 优先从PATH查找
+    with patch("shutil.which", return_value="/usr/local/bin/joern"):
+        with patch.object(Path, "exists", return_value=True):
+            manager = JoernManager()
+            assert "/usr/local/bin/joern" in str(manager.joern_path)
+
+
+def test_joern_not_found_in_all_locations(monkeypatch):
+    """测试所有位置都找不到Joern"""
+    from joern_mcp import config
+
+    with patch("shutil.which", return_value=None):
+        monkeypatch.setattr(config.settings, "joern_home", None)
+        monkeypatch.delenv("JOERN_HOME", raising=False)
+
+        with pytest.raises(JoernNotFoundError):
+            JoernManager()

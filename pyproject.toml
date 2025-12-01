@@ -119,6 +119,7 @@ markers = [
     "requires_joern: marks tests that require Joern installation",
     "performance: marks tests as performance tests",
     "stress: marks tests as stress tests",
+    "e2e: marks tests as end-to-end tests (deselect with '-m \"not e2e\"')",
 ]
 asyncio_mode = "auto"
 filterwarnings = [

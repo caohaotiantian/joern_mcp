@@ -146,10 +146,10 @@ class CallGraphService:
 
         try:
             if direction == "up":
-                # 向上追踪调用者
+                # 向上追踪调用者（使用正确的repeat语法）
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.caller)(_.times({max_depth}))
+                   .repeat(_.caller)({max_depth})
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -158,10 +158,10 @@ class CallGraphService:
                    ))
                 '''
             else:
-                # 向下追踪被调用者
+                # 向下追踪被调用者（使用正确的repeat语法）
                 query = f'''
                 cpg.method.name("{function_name}")
-                   .repeat(_.callee)(_.times({max_depth}))
+                   .repeat(_.callee)({max_depth})
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
