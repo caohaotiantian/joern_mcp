@@ -49,19 +49,51 @@ class CallGraphService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    callers = json.loads(stdout)
+                    # 尝试解析JSON
+                    callers = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(callers, str):
+                        callers = json.loads(callers)
                     return {
                         "success": True,
                         "function": function_name,
                         "depth": depth,
-                        "callers": callers if isinstance(callers, list) else [callers],
-                        "count": len(callers) if isinstance(callers, list) else 1,
+                        "callers": callers if isinstance(callers, list) else [callers] if callers else [],
+                        "count": len(callers) if isinstance(callers, list) else (1 if callers else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            callers = json.loads(json_str)
+                            if isinstance(callers, str):
+                                callers = json.loads(callers)
+                            return {
+                                "success": True,
+                                "function": function_name,
+                                "depth": depth,
+                                "callers": callers if isinstance(callers, list) else [callers] if callers else [],
+                                "count": len(callers) if isinstance(callers, list) else (1 if callers else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
+                    # 解析失败，返回空结果而不是raw_output
                     return {
                         "success": True,
                         "function": function_name,
+                        "depth": depth,
+                        "callers": [],
+                        "count": 0,
                         "raw_output": stdout,
                     }
             else:
@@ -105,19 +137,51 @@ class CallGraphService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+
+                # 移除ANSI颜色码
+                import re
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                clean_output = ansi_escape.sub('', stdout).strip()
+
                 try:
-                    callees = json.loads(stdout)
+                    # 尝试解析JSON
+                    callees = json.loads(clean_output)
+                    # 处理双重编码
+                    if isinstance(callees, str):
+                        callees = json.loads(callees)
                     return {
                         "success": True,
                         "function": function_name,
                         "depth": depth,
-                        "callees": callees if isinstance(callees, list) else [callees],
-                        "count": len(callees) if isinstance(callees, list) else 1,
+                        "callees": callees if isinstance(callees, list) else [callees] if callees else [],
+                        "count": len(callees) if isinstance(callees, list) else (1 if callees else 0),
                     }
                 except json.JSONDecodeError:
+                    # 尝试从Scala REPL输出提取JSON
+                    match = re.search(r'=\s*(.+)$', clean_output)
+                    if match:
+                        try:
+                            json_str = match.group(1).strip()
+                            callees = json.loads(json_str)
+                            if isinstance(callees, str):
+                                callees = json.loads(callees)
+                            return {
+                                "success": True,
+                                "function": function_name,
+                                "depth": depth,
+                                "callees": callees if isinstance(callees, list) else [callees] if callees else [],
+                                "count": len(callees) if isinstance(callees, list) else (1 if callees else 0),
+                            }
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
+                    # 解析失败，返回空结果
                     return {
                         "success": True,
                         "function": function_name,
+                        "depth": depth,
+                        "callees": [],
+                        "count": 0,
                         "raw_output": stdout,
                     }
             else:
@@ -216,9 +280,14 @@ class CallGraphService:
                         except (json.JSONDecodeError, AttributeError):
                             pass
 
+                    # 解析失败，返回空chain
                     return {
                         "success": True,
                         "function": function_name,
+                        "direction": direction,
+                        "max_depth": max_depth,
+                        "chain": [],
+                        "count": 0,
                         "raw_output": stdout,
                     }
             else:

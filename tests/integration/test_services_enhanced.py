@@ -36,16 +36,34 @@ class TestCallGraphServiceEnhanced:
         # 测试获取调用链
         result = await service.get_call_chain("main", max_depth=3)
 
-        # 严格验证
+        # 基本验证
         assert isinstance(result, dict), f"返回类型应该是dict，实际: {type(result)}"
         assert "function" in result, "应该包含function字段"
         assert result["function"] == "main", f"函数名应该是main，实际: {result.get('function')}"
         assert "success" in result, "应该包含success字段"
 
-        # 如果成功，验证chain结构
+        # 深度验证chain结构
         if result.get("success"):
-            assert "chain" in result or "depth" in result, \
-                "成功时应该包含chain或depth信息"
+            assert "chain" in result, "成功时应该包含chain字段"
+            assert "max_depth" in result, "应该包含max_depth字段"
+            assert result["max_depth"] == 3, f"max_depth应该是3，实际: {result.get('max_depth')}"
+
+            chain = result["chain"]
+            assert isinstance(chain, list), "chain应该是列表"
+
+            # 如果chain不为空，验证每个节点的结构
+            for i, node in enumerate(chain):
+                assert isinstance(node, dict), f"chain[{i}]应该是dict"
+                assert "name" in node, f"chain[{i}]应该包含name字段"
+                assert isinstance(node["name"], str), f"chain[{i}].name应该是字符串"
+
+                # 验证可选字段的类型
+                if "filename" in node:
+                    assert isinstance(node["filename"], str), \
+                        f"chain[{i}].filename应该是字符串"
+                if "lineNumber" in node:
+                    assert isinstance(node["lineNumber"], int) or node["lineNumber"] == -1, \
+                        f"chain[{i}].lineNumber应该是整数"
 
     @pytest.mark.asyncio
     async def test_get_call_graph(self, joern_server, sample_c_code):
@@ -103,17 +121,46 @@ class TestDataFlowServiceEnhanced:
         # 测试变量流分析
         result = await service.analyze_variable_flow("main", "buffer")
 
-        # 严格验证
+        # 基本验证
         assert isinstance(result, dict), f"返回类型应该是dict，实际: {type(result)}"
         assert "success" in result, "应该包含success字段"
         assert "variable" in result, "应该包含variable字段"
         assert result["variable"] == "main", \
             f"变量名应该是main，实际: {result.get('variable')}"
 
-        # 如果成功，验证流信息
+        # 深度验证flows内容
         if result.get("success"):
             assert "flows" in result or "sink_method" in result, \
                 "成功时应该包含流信息"
+            assert result.get("sink_method") == "buffer", \
+                f"sink_method应该是buffer，实际: {result.get('sink_method')}"
+
+            # 如果有flows数据，验证其结构
+            if "flows" in result and result["flows"]:
+                flows = result["flows"]
+                assert isinstance(flows, list), "flows应该是列表"
+
+                for i, flow in enumerate(flows):
+                    assert isinstance(flow, dict), f"flow[{i}]应该是dict"
+                    # 验证必需字段存在
+                    for field in ["source", "sink"]:
+                        assert field in flow, f"flow[{i}]应该包含{field}字段"
+
+                    # 验证source结构
+                    source = flow["source"]
+                    assert isinstance(source, dict), f"flow[{i}].source应该是dict"
+                    assert "code" in source, f"flow[{i}].source应该包含code"
+                    assert "line" in source, f"flow[{i}].source应该包含line"
+                    assert isinstance(source.get("line"), int) or source.get("line") == -1, \
+                        f"flow[{i}].source.line应该是整数"
+
+                    # 验证sink结构
+                    sink = flow["sink"]
+                    assert isinstance(sink, dict), f"flow[{i}].sink应该是dict"
+                    assert "code" in sink, f"flow[{i}].sink应该包含code"
+                    assert "line" in sink, f"flow[{i}].sink应该包含line"
+                    assert isinstance(sink.get("line"), int) or sink.get("line") == -1, \
+                        f"flow[{i}].sink.line应该是整数"
 
     @pytest.mark.asyncio
     async def test_find_data_dependencies(self, joern_server, sample_c_code):
@@ -126,17 +173,38 @@ class TestDataFlowServiceEnhanced:
         # 测试查找数据依赖
         result = await service.find_data_dependencies("main")
 
-        # 严格验证
+        # 基本验证
         assert isinstance(result, dict), f"返回类型应该是dict，实际: {type(result)}"
         assert "function" in result, "应该包含function字段"
         assert result["function"] == "main", \
             f"函数名应该是main，实际: {result.get('function')}"
         assert "success" in result, "应该包含success字段"
 
-        # 如果成功，验证依赖信息
+        # 深度验证依赖信息
         if result.get("success"):
-            assert "dependencies" in result or "total_dependencies" in result, \
-                "成功时应该包含依赖信息"
+            assert "dependencies" in result, "成功时应该包含dependencies字段"
+
+            dependencies = result["dependencies"]
+            assert isinstance(dependencies, list), "dependencies应该是列表"
+
+            # 如果有依赖数据，验证其结构
+            if dependencies:
+                for i, dep in enumerate(dependencies):
+                    assert isinstance(dep, dict), f"dependency[{i}]应该是dict"
+                    # 验证必需字段
+                    assert "variable" in dep, f"dependency[{i}]应该包含variable"
+                    assert "code" in dep, f"dependency[{i}]应该包含code"
+
+                    # 验证数据类型
+                    assert isinstance(dep.get("variable"), str), \
+                        f"dependency[{i}].variable应该是字符串"
+                    assert isinstance(dep.get("code"), str), \
+                        f"dependency[{i}].code应该是字符串"
+
+                    # 如果有line字段，验证其类型
+                    if "line" in dep:
+                        assert isinstance(dep["line"], int) or dep["line"] == -1, \
+                            f"dependency[{i}].line应该是整数"
 
     @pytest.mark.asyncio
     async def test_track_dataflow_with_limits(self, joern_server, sample_c_code):

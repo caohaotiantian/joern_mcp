@@ -82,11 +82,10 @@ class JoernHTTPClient:
                         f"Unexpected first message on websocket: {connected_msg}"
                     )
 
-                # 2. POST查询（禁用代理）
+                # 2. POST查询
                 post_endpoint = self._post_query_endpoint()
                 async with httpx.AsyncClient(
                     timeout=self.timeout,
-                    proxies={},  # 禁用代理
                 ) as http_client:
                     post_res = await http_client.post(
                         post_endpoint,

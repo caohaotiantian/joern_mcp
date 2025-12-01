@@ -19,12 +19,23 @@ async def test_get_callers():
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_callers("vulnerable_func")
+    result = await service.get_callers("vulnerable_func", depth=1)
 
+    # 验证返回结果
     assert result["success"] is True
     assert result["function"] == "vulnerable_func"
+    assert result["depth"] == 1
     assert len(result["callers"]) >= 1
     assert result["callers"][0]["name"] == "main"
+
+    # 验证Mock被正确调用
+    mock_executor.execute.assert_called_once()
+
+    # 验证查询参数
+    call_args = mock_executor.execute.call_args[0][0]
+    assert isinstance(call_args, str), "查询应该是字符串"
+    assert "vulnerable_func" in call_args, "查询应该包含函数名"
+    assert "caller" in call_args, "查询应该获取调用者"
 
 
 @pytest.mark.asyncio
@@ -39,11 +50,23 @@ async def test_get_callees():
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_callees("main")
+    result = await service.get_callees("main", depth=1)
 
+    # 验证返回结果
     assert result["success"] is True
     assert result["function"] == "main"
+    assert result["depth"] == 1
     assert len(result["callees"]) >= 1
+    assert result["callees"][0]["name"] == "strcpy"
+
+    # 验证Mock被正确调用
+    mock_executor.execute.assert_called_once()
+
+    # 验证查询参数
+    call_args = mock_executor.execute.call_args[0][0]
+    assert isinstance(call_args, str), "查询应该是字符串"
+    assert "main" in call_args, "查询应该包含函数名"
+    assert "callee" in call_args, "查询应该获取被调用者"
 
 
 @pytest.mark.asyncio

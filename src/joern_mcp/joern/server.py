@@ -25,7 +25,7 @@ class JoernServerManager:
         host: str | None = None,
         port: int | None = None,
         joern_manager: JoernManager | None = None,
-        use_http_client: bool = False,  # 新增：默认使用cpgqls保持兼容性
+        use_http_client: bool = False,  # 暂时保持cpgqls-client，HTTP客户端需进一步调试
     ) -> None:
         self.host = host or settings.joern_server_host
         self.port = port or settings.joern_server_port
@@ -282,7 +282,9 @@ class JoernServerManager:
         """导入代码生成CPG"""
         logger.info(f"Importing code from {source_path} as {project_name}")
         query = import_code_query(source_path, project_name)
-        result = self.execute_query(query)
+        
+        # 使用异步方法（兼容HTTP和cpgqls-client）
+        result = await self.execute_query_async(query)
 
         if result.get("success"):
             logger.info(f"Code imported successfully: {project_name}")

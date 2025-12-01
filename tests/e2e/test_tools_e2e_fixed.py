@@ -68,10 +68,37 @@ class TestQueryToolsE2E:
         query = "cpg.method.name.l"
         result = await execute_query_safe(joern_server, query)
 
-        assert result["success"], f"查询失败: {result.get('stderr', '')}"
-        # 应该包含main, unsafe_strcpy, process_input等函数
-        stdout = result.get("stdout", "")
-        assert "main" in stdout or "[]" in stdout, "未返回函数列表"
+        # 强断言验证
+        assert result.get("success"), f"查询失败: {result.get('stderr', '')}"
+        assert "stdout" in result, "应该包含stdout字段"
+
+        stdout = result["stdout"]
+        assert stdout is not None, "stdout不应该是None"
+
+        # 解析函数列表
+        import json
+        if isinstance(stdout, list):
+            functions = stdout
+        elif isinstance(stdout, str):
+            # 尝试解析为JSON
+            try:
+                functions = json.loads(stdout) if stdout else []
+            except json.JSONDecodeError:
+                # 可能是逗号分隔的字符串
+                functions = [f.strip() for f in stdout.split(',') if f.strip()]
+        else:
+            functions = []
+
+        # 验证函数列表结构
+        assert isinstance(functions, list), f"函数列表应该是list，实际: {type(functions)}"
+
+        # 验证包含预期的函数（基于sample_c代码）
+        expected_functions = ["main", "unsafe_strcpy", "process_input"]
+        function_names = [f if isinstance(f, str) else str(f) for f in functions]
+
+        for expected in expected_functions:
+            assert any(expected in fname for fname in function_names), \
+                f"函数列表应该包含{expected}，实际: {function_names}"
 
 
 @pytest.mark.e2e
@@ -107,7 +134,6 @@ class TestCallGraphToolsE2E:
         assert "function" in result, "返回结果缺少function字段"
         assert "success" in result, "返回结果缺少success字段"
 
-    @pytest.mark.xfail(reason="get_call_chain的Joern查询可能在某些情况下失败")
     async def test_analyze_call_chain_workflow(self, joern_server, sample_c_code):
         """测试分析调用链的完整流程"""
         await import_code_safe(joern_server, str(sample_c_code), "call_chain_test")
@@ -131,7 +157,6 @@ class TestCallGraphToolsE2E:
 class TestDataFlowToolsE2E:
     """测试数据流工具的E2E流程"""
 
-    @pytest.mark.xfail(reason="数据流查询可能因代码结构而无结果")
     async def test_track_dataflow_workflow(self, joern_server, sample_c_code):
         """测试追踪数据流的完整流程"""
         await import_code_safe(joern_server, str(sample_c_code), "dataflow_test")
@@ -184,7 +209,6 @@ class TestTaintToolsE2E:
                 "成功时应该包含vulnerabilities或summary字段"
             )
 
-    @pytest.mark.xfail(reason="特定流检查可能无结果")
     async def test_check_specific_flow_workflow(self, joern_server, sample_c_code):
         """测试检查特定流的完整流程"""
         await import_code_safe(joern_server, str(sample_c_code), "flow_test")
