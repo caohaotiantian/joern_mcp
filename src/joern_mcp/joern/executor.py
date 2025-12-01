@@ -96,7 +96,9 @@ class QueryExecutor:
                     )
             except asyncio.TimeoutError:
                 logger.error(f"Query timeout after {timeout_val}s")
-                raise QueryExecutionError(f"Query timeout after {timeout_val}s") from None
+                raise QueryExecutionError(
+                    f"Query timeout after {timeout_val}s"
+                ) from None
             except Exception as e:
                 logger.error(f"Query execution failed: {e}")
                 raise QueryExecutionError(str(e)) from None

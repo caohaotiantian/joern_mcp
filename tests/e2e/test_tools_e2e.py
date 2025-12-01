@@ -3,6 +3,7 @@ E2E测试 - MCP工具层（修复版）
 
 真正验证功能的正确性，不掩盖问题
 """
+
 import pytest
 
 from joern_mcp.joern.executor import QueryExecutor
@@ -11,7 +12,7 @@ from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.dataflow import DataFlowService
 from joern_mcp.services.taint import TaintAnalysisService
 
-from .test_helpers import import_code_safe, execute_query_safe
+from .test_helpers import execute_query_safe, import_code_safe
 
 
 @pytest.mark.e2e
@@ -27,10 +28,14 @@ class TestProjectToolsE2E:
 
         # 1. 导入代码
         result = await import_code_safe(joern_server, str(sample_c_code), project_name)
-        assert result["success"], f"导入代码失败: {result.get('stderr', 'Unknown error')}"
+        assert result["success"], (
+            f"导入代码失败: {result.get('stderr', 'Unknown error')}"
+        )
 
         # 2. 验证项目已创建
-        projects_result = await execute_query_safe(joern_server, "workspace.projects.name.l")
+        projects_result = await execute_query_safe(
+            joern_server, "workspace.projects.name.l"
+        )
         assert projects_result["success"], "列出项目失败"
 
         # 3. 删除项目
@@ -85,7 +90,9 @@ class TestCallGraphToolsE2E:
         # 真正的验证
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "function" in result, "返回结果缺少function字段"
-        assert result["function"] == "unsafe_strcpy", f"函数名不匹配: {result.get('function')}"
+        assert result["function"] == "unsafe_strcpy", (
+            f"函数名不匹配: {result.get('function')}"
+        )
         assert "success" in result, "返回结果缺少success字段"
 
     async def test_get_callees_workflow(self, joern_server, sample_c_code):
@@ -113,7 +120,7 @@ class TestCallGraphToolsE2E:
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "function" in result, "返回结果缺少function字段"
         assert result["function"] == "main", f"函数名不匹配: {result.get('function')}"
-        
+
         # 如果查询成功，验证有chain数据
         if result.get("success"):
             assert "chain" in result, "成功时应该包含chain字段"
@@ -136,7 +143,9 @@ class TestDataFlowToolsE2E:
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "返回结果缺少success字段"
         assert "source_method" in result, "返回结果缺少source_method字段"
-        assert result["source_method"] == "main", f"源方法不匹配: {result.get('source_method')}"
+        assert result["source_method"] == "main", (
+            f"源方法不匹配: {result.get('source_method')}"
+        )
 
     async def test_analyze_variable_flow_workflow(self, joern_server, sample_c_code):
         """测试分析变量流的完整流程"""
@@ -167,11 +176,12 @@ class TestTaintToolsE2E:
         # 真正验证 - find_vulnerabilities返回dict而非list
         assert isinstance(results, dict), f"返回类型错误，应该是dict: {type(results)}"
         assert "success" in results, "返回结果缺少success字段"
-        
+
         # 如果成功，验证结构
         if results.get("success"):
-            assert "vulnerabilities" in results or "summary" in results, \
+            assert "vulnerabilities" in results or "summary" in results, (
                 "成功时应该包含vulnerabilities或summary字段"
+            )
 
     @pytest.mark.xfail(reason="特定流检查可能无结果")
     async def test_check_specific_flow_workflow(self, joern_server, sample_c_code):
@@ -215,7 +225,7 @@ class TestBatchToolsE2E:
 
         queries = ["cpg.method.name.l", "cpg.call.name.l", "cpg.literal.code.l"]
         results = []
-        
+
         for query in queries:
             result = await execute_query_safe(joern_server, query)
             results.append(result)
@@ -273,4 +283,3 @@ class TestServerStateE2E:
 
         result = await execute_query_safe(joern_server, "cpg.method.name.l")
         assert result["success"], f"查询失败: {result.get('stderr', '')}"
-

@@ -161,7 +161,9 @@ class JoernServerManager:
                     stderr = (
                         await self.process.stderr.read() if self.process.stderr else b""
                     )
-                    raise JoernServerError(f"Server process exited: {stderr.decode()}") from None
+                    raise JoernServerError(
+                        f"Server process exited: {stderr.decode()}"
+                    ) from None
 
                 await asyncio.sleep(1.0)  # 增加等待间隔
 

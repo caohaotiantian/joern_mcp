@@ -5,7 +5,6 @@ tests/test_main.py
 """
 
 
-
 def test_main_module_can_be_imported():
     """测试__main__模块可以导入"""
     # 简单测试，不实际运行main

@@ -3,6 +3,7 @@
 
 完整测试performance.py中的所有类和功能
 """
+
 import asyncio
 
 import pytest
@@ -486,4 +487,3 @@ class TestGlobalMetrics:
         metrics2 = get_metrics()
         # 应该是同一个实例
         assert metrics2.total_queries == 1
-

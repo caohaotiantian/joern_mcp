@@ -3,6 +3,7 @@
 
 完整测试executor_optimized.py中的所有功能
 """
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -317,9 +318,7 @@ class TestOptimizedQueryExecutor:
     async def test_exception_handling(self):
         """测试异常处理"""
         mock_server = MagicMock()
-        mock_server.execute_query_async = AsyncMock(
-            side_effect=Exception("Test error")
-        )
+        mock_server.execute_query_async = AsyncMock(side_effect=Exception("Test error"))
 
         executor = OptimizedQueryExecutor(mock_server)
 
@@ -389,4 +388,3 @@ class TestOptimizedQueryExecutor:
 
         # 第二次调用不应该执行查询（缓存命中）
         assert call_count_2 == call_count_1
-

@@ -3,6 +3,7 @@
 
 使用Mock测试server.py中的逻辑，避免真实启动Joern
 """
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -274,7 +275,8 @@ class TestJoernServerErrorHandling:
                 patch(
                     "asyncio.create_subprocess_exec",
                     side_effect=Exception("Failed to start"),
-                ),pytest.raises(JoernServerError, match="Failed to start")
+                ),
+                pytest.raises(JoernServerError, match="Failed to start"),
             ):
                 await manager.start()
 
@@ -305,11 +307,16 @@ class TestJoernServerErrorHandling:
 
             mock_client = MagicMock()
             mock_client.execute = MagicMock(
-                return_value={"response": "false", "success": False, "error": "Import failed"}
+                return_value={
+                    "response": "false",
+                    "success": False,
+                    "error": "Import failed",
+                }
             )
             manager.client = mock_client
 
-            with patch("joern_mcp.joern.server.import_code_query", return_value="import_query"):
+            with patch(
+                "joern_mcp.joern.server.import_code_query", return_value="import_query"
+            ):
                 result = await manager.import_code("/path", "project")
                 assert result["success"] is False
-

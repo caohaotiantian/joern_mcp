@@ -3,8 +3,8 @@ E2E测试的fixture配置
 
 提供测试所需的环境和数据
 """
+
 import asyncio
-from pathlib import Path
 
 import pytest
 
@@ -91,15 +91,15 @@ public class Main {
     public static void unsafeMethod(String input) {
         System.out.println(input);
     }
-    
+
     public static void caller1() {
         unsafeMethod("test");
     }
-    
+
     public static void caller2() {
         caller1();
     }
-    
+
     public static void main(String[] args) {
         caller2();
     }
@@ -108,4 +108,3 @@ public class Main {
     )
 
     return code_dir
-

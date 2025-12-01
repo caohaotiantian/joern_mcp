@@ -5,7 +5,6 @@ tests/test_mcp_server.py
 """
 
 
-
 def test_mcp_server_module_exists():
     """测试MCP服务器模块存在"""
     from pathlib import Path

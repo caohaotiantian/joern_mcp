@@ -1,7 +1,5 @@
 """数据流分析MCP工具"""
 
-
-
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.dataflow import DataFlowService
 

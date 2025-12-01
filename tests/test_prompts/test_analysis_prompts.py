@@ -5,7 +5,6 @@ tests/test_prompts/test_analysis_prompts.py
 """
 
 
-
 def test_prompts_module_exists():
     """测试prompts模块存在"""
     from pathlib import Path

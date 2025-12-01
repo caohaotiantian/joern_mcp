@@ -1,6 +1,5 @@
 """测试MCP Tools集成"""
 
-
 import pytest
 
 from joern_mcp.joern.executor import QueryExecutor

@@ -3,6 +3,7 @@ E2E测试 - MCP Resources和Prompts（修复版）
 
 真正验证功能的正确性，不掩盖问题
 """
+
 import pytest
 
 from joern_mcp.joern.executor import QueryExecutor
@@ -10,7 +11,7 @@ from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.dataflow import DataFlowService
 from joern_mcp.services.taint import TaintAnalysisService
 
-from .test_helpers import import_code_safe, execute_query_safe, health_check_safe
+from .test_helpers import execute_query_safe, health_check_safe, import_code_safe
 
 
 @pytest.mark.e2e
@@ -26,7 +27,9 @@ class TestProjectResourcesE2E:
 
         query = "workspace.projects.name.l"
         projects_result = await execute_query_safe(joern_server, query)
-        assert projects_result["success"], f"查询项目失败: {projects_result.get('stderr', '')}"
+        assert projects_result["success"], (
+            f"查询项目失败: {projects_result.get('stderr', '')}"
+        )
 
     async def test_project_functions_resource(self, joern_server, sample_c_code):
         """测试项目函数列表资源"""
@@ -127,8 +130,8 @@ class TestPerformanceToolsE2E:
 
         # 执行多个查询验证功能正常
         successful_queries = 0
-        for i in range(5):
-            result = await execute_query_safe(joern_server, 'cpg.method.name.l')
+        for _i in range(5):
+            result = await execute_query_safe(joern_server, "cpg.method.name.l")
             if result.get("success"):
                 successful_queries += 1
 
@@ -146,7 +149,9 @@ class TestComplexWorkflowE2E:
         project_name = "full_workflow_test"
 
         # 1. 导入代码
-        import_result = await import_code_safe(joern_server, str(sample_c_code), project_name)
+        import_result = await import_code_safe(
+            joern_server, str(sample_c_code), project_name
+        )
         assert import_result["success"], f"导入失败: {import_result.get('stderr', '')}"
 
         executor = QueryExecutor(joern_server)
@@ -158,7 +163,7 @@ class TestComplexWorkflowE2E:
         # 3. 分析调用关系（真正验证）
         callgraph_service = CallGraphService(executor)
         callers = await callgraph_service.get_callers("unsafe_strcpy")
-        
+
         assert isinstance(callers, dict), "get_callers返回类型错误"
         assert "function" in callers, "调用者结果缺少function字段"
         assert callers["function"] == "unsafe_strcpy", "函数名不匹配"
@@ -166,14 +171,14 @@ class TestComplexWorkflowE2E:
         # 4. 数据流分析（标记为可能失败）
         dataflow_service = DataFlowService(executor)
         flow = await dataflow_service.track_dataflow("main", "buffer")
-        
+
         assert isinstance(flow, dict), "track_dataflow返回类型错误"
         assert "success" in flow, "数据流结果缺少success字段"
 
         # 5. 污点分析
         taint_service = TaintAnalysisService(executor)
         vulns = await taint_service.find_vulnerabilities()
-        
+
         assert isinstance(vulns, dict), "find_vulnerabilities应返回dict"
         assert "success" in vulns, "漏洞分析结果缺少success字段"
 
@@ -240,7 +245,9 @@ class TestErrorHandlingE2E:
         invalid_dir.mkdir()
         (invalid_dir / "invalid.c").write_text("this is not valid C code ###")
 
-        result = await import_code_safe(joern_server, str(invalid_dir), "invalid_project")
+        result = await import_code_safe(
+            joern_server, str(invalid_dir), "invalid_project"
+        )
 
         # 真正验证：导入无效代码应该明确失败或返回警告
         assert isinstance(result, dict), "返回类型应该是dict"

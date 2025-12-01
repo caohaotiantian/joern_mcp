@@ -8,9 +8,7 @@ from joern_mcp.mcp_server import mcp, server_state
 
 
 @mcp.tool()
-async def get_function_code(
-    function_name: str, file_filter: str | None = None
-) -> dict:
+async def get_function_code(function_name: str, file_filter: str | None = None) -> dict:
     """
     获取指定函数的源代码
 
