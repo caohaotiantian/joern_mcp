@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from loguru import logger
 
 from joern_mcp.config import settings
-from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.executor_optimized import OptimizedQueryExecutor
 from joern_mcp.joern.server import JoernServerManager
 from joern_mcp.mcp_server import mcp, server_state
 
@@ -20,8 +20,8 @@ async def lifespan(_app) -> AsyncIterator[None]:
     server_state.joern_server = JoernServerManager()
     await server_state.joern_server.start()
 
-    # 初始化查询执行器
-    server_state.query_executor = QueryExecutor(server_state.joern_server)
+    # 初始化优化的查询执行器
+    server_state.query_executor = OptimizedQueryExecutor(server_state.joern_server)
 
     logger.info("Joern MCP Server started successfully")
     logger.info(f"Joern endpoint: {server_state.joern_server.endpoint}")

@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.executor_optimized import OptimizedQueryExecutor as QueryExecutor
 from joern_mcp.joern.manager import JoernManager
 
 

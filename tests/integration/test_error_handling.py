@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.executor_optimized import OptimizedQueryExecutor as QueryExecutor
 from joern_mcp.joern.manager import JoernManager
 from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.taint import TaintAnalysisService
@@ -40,7 +40,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_dangerous_query_blocked(self, joern_server):
         """测试危险查询被阻止"""
-        from joern_mcp.joern.executor import QueryValidationError
+        from joern_mcp.joern.executor_optimized import QueryValidationError
 
         executor = QueryExecutor(joern_server)
 

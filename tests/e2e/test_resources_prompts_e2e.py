@@ -6,7 +6,7 @@ E2E测试 - MCP Resources和Prompts（修复版）
 
 import pytest
 
-from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.executor_optimized import OptimizedQueryExecutor as QueryExecutor
 from joern_mcp.services.callgraph import CallGraphService
 from joern_mcp.services.dataflow import DataFlowService
 from joern_mcp.services.taint import TaintAnalysisService

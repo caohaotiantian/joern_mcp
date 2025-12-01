@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.joern.executor_optimized import OptimizedQueryExecutor as QueryExecutor
 from joern_mcp.joern.manager import JoernManager
 
 
@@ -37,9 +37,12 @@ class TestServerLifecycle:
         """测试查询执行器初始化"""
         executor = QueryExecutor(joern_server)
 
-        # 验证缓存
-        assert executor.cache is not None
-        assert executor.query_semaphore is not None
+        # 验证OptimizedQueryExecutor组件
+        assert executor.cache is not None  # 混合缓存
+        assert executor.semaphore is not None  # 自适应并发控制
+        assert executor.complexity_analyzer is not None  # 复杂度分析器
+        assert executor.slow_query_logger is not None  # 慢查询日志
+        assert executor.metrics is not None  # 性能指标
 
     @pytest.mark.asyncio
     async def test_concurrent_queries(self, joern_server):
