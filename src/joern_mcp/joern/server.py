@@ -25,7 +25,7 @@ class JoernServerManager:
         host: str | None = None,
         port: int | None = None,
         joern_manager: JoernManager | None = None,
-        use_http_client: bool = False,  # 暂时保持cpgqls-client，HTTP客户端需进一步调试
+        use_http_client: bool = True,  # 默认使用HTTP客户端（已修复，稳定工作）
     ) -> None:
         self.host = host or settings.joern_server_host
         self.port = port or settings.joern_server_port

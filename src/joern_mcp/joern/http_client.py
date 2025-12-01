@@ -16,7 +16,7 @@ Joern Server工作模式（参考cpgqls-client实现）：
 import asyncio
 from typing import Any
 
-import httpx
+import requests  # 使用同步requests，与cpgqls-client一致
 import websockets
 from loguru import logger
 
@@ -74,59 +74,72 @@ class JoernHTTPClient:
         try:
             # 1. 建立WebSocket连接
             connect_endpoint = self._connect_endpoint()
+            logger.debug(f"连接WebSocket: {connect_endpoint}")
+            
             async with websockets.connect(connect_endpoint, ping_interval=None) as ws_conn:
+                logger.debug("WebSocket连接成功，等待确认消息...")
                 # 等待连接确认消息
                 connected_msg = await ws_conn.recv()
+                logger.debug(f"收到消息: {connected_msg}")
+                
                 if connected_msg != self.CPGQLS_MSG_CONNECTED:
                     raise Exception(
                         f"Unexpected first message on websocket: {connected_msg}"
                     )
+                logger.debug("WebSocket连接已确认")
 
-                # 2. POST查询
+                # 2. POST查询（使用同步requests，与cpgqls-client一致）
                 post_endpoint = self._post_query_endpoint()
-                async with httpx.AsyncClient(
+                logger.debug(f"POST查询到: {post_endpoint}")
+                
+                post_res = requests.post(
+                    post_endpoint,
+                    json={"query": query},
+                    auth=self.auth,
                     timeout=self.timeout,
-                ) as http_client:
-                    post_res = await http_client.post(
-                        post_endpoint,
-                        json={"query": query},
-                        auth=self.auth,
+                )
+                logger.debug(f"POST响应状态: {post_res.status_code}")
+
+                # 检查认证
+                if post_res.status_code == 401:
+                    raise Exception("Basic authentication failed")
+                elif post_res.status_code != 200:
+                    raise Exception(
+                        f"Could not post query: HTTP {post_res.status_code}, body: {post_res.text}"
                     )
 
-                    # 检查认证
-                    if post_res.status_code == 401:
-                        raise Exception("Basic authentication failed")
-                    elif post_res.status_code != 200:
-                        raise Exception(
-                            f"Could not post query: HTTP {post_res.status_code}"
-                        )
+                # 获取查询UUID
+                query_uuid = post_res.json()["uuid"]
+                logger.debug(f"查询已提交，UUID: {query_uuid}")
 
-                    # 获取查询UUID
-                    query_uuid = post_res.json()["uuid"]
-                    logger.debug(f"Query posted with UUID: {query_uuid}")
+                # 3. 等待WebSocket完成通知
+                logger.debug(f"等待WebSocket完成通知（超时: {self.timeout}s）...")
+                completion_msg = await asyncio.wait_for(ws_conn.recv(), timeout=self.timeout)
+                logger.debug(f"收到完成通知: {completion_msg}")
 
-                    # 3. 等待WebSocket完成通知
-                    await asyncio.wait_for(ws_conn.recv(), timeout=self.timeout)
+                # 4. GET查询结果（同步requests）
+                result_endpoint = self._get_result_endpoint(query_uuid)
+                logger.debug(f"GET结果从: {result_endpoint}")
+                
+                get_res = requests.get(
+                    result_endpoint,
+                    auth=self.auth,
+                    timeout=self.timeout,
+                )
+                logger.debug(f"GET响应状态: {get_res.status_code}")
 
-                    # 4. GET查询结果
-                    result_endpoint = self._get_result_endpoint(query_uuid)
-                    get_res = await http_client.get(
-                        result_endpoint,
-                        auth=self.auth,
+                # 检查结果获取
+                if get_res.status_code == 401:
+                    raise Exception("Basic authentication failed")
+                elif get_res.status_code != 200:
+                    raise Exception(
+                        f"Could not retrieve result: HTTP {get_res.status_code}, body: {get_res.text}"
                     )
 
-                    # 检查结果获取
-                    if get_res.status_code == 401:
-                        raise Exception("Basic authentication failed")
-                    elif get_res.status_code != 200:
-                        raise Exception(
-                            f"Could not retrieve result: HTTP {get_res.status_code}"
-                        )
-
-                    # 返回结果
-                    result = get_res.json()
-                    logger.debug(f"Query completed successfully: {query[:50]}...")
-                    return result
+                # 返回结果
+                result = get_res.json()
+                logger.debug(f"查询成功完成: {query[:50]}...")
+                return result
 
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
