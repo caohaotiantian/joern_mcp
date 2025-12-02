@@ -14,11 +14,24 @@ Joern Server工作模式（参考cpgqls-client实现）：
 """
 
 import asyncio
+import time
 from typing import Any
 
 import requests  # 使用同步requests，与cpgqls-client一致
 import websockets
 from loguru import logger
+
+# 全局信号量：限制并发WebSocket连接数，避免资源竞争
+_connection_semaphore: asyncio.Semaphore | None = None
+_MAX_CONCURRENT_CONNECTIONS = 5  # 最大并发连接数（支持4-5个并发查询）
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    """获取或创建连接信号量（延迟初始化，避免事件循环问题）"""
+    global _connection_semaphore
+    if _connection_semaphore is None:
+        _connection_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_CONNECTIONS)
+    return _connection_semaphore
 
 
 class JoernHTTPClient:
@@ -71,6 +84,14 @@ class JoernHTTPClient:
         Raises:
             Exception: 连接或查询失败
         """
+        # 使用信号量限制并发连接数，避免资源竞争
+        semaphore = _get_semaphore()
+
+        async with semaphore:
+            return await self._execute_internal(query)
+
+    async def _execute_internal(self, query: str) -> dict[str, Any]:
+        """内部执行方法（在信号量保护下调用）"""
         try:
             # 1. 建立WebSocket连接
             connect_endpoint = self._connect_endpoint()
@@ -112,10 +133,29 @@ class JoernHTTPClient:
                 query_uuid = post_res.json()["uuid"]
                 logger.debug(f"查询已提交，UUID: {query_uuid}")
 
-                # 3. 等待WebSocket完成通知
-                logger.debug(f"等待WebSocket完成通知（超时: {self.timeout}s）...")
-                completion_msg = await asyncio.wait_for(ws_conn.recv(), timeout=self.timeout)
-                logger.debug(f"收到完成通知: {completion_msg}")
+                # 3. 等待WebSocket完成通知（必须等到我们提交的查询完成）
+                logger.debug(f"等待查询 {query_uuid} 的完成通知（超时: {self.timeout}s）...")
+
+                # 循环等待，直到收到我们查询的UUID
+                start_time = time.time()
+                while True:
+                    remaining_timeout = self.timeout - (time.time() - start_time)
+                    if remaining_timeout <= 0:
+                        raise asyncio.TimeoutError(f"等待查询 {query_uuid} 完成超时")
+
+                    completion_msg = await asyncio.wait_for(
+                        ws_conn.recv(),
+                        timeout=remaining_timeout
+                    )
+                    logger.debug(f"收到完成通知: {completion_msg}")
+
+                    # 检查是否是我们的查询完成
+                    if completion_msg == query_uuid:
+                        logger.debug(f"查询 {query_uuid} 已完成")
+                        break
+                    else:
+                        # 收到其他查询的通知，继续等待
+                        logger.debug(f"收到其他查询的通知 {completion_msg}，继续等待 {query_uuid}")
 
                 # 4. GET查询结果（同步requests）
                 result_endpoint = self._get_result_endpoint(query_uuid)
@@ -136,17 +176,38 @@ class JoernHTTPClient:
                         f"Could not retrieve result: HTTP {get_res.status_code}, body: {get_res.text}"
                     )
 
-                # 返回结果
-                result = get_res.json()
+                # 获取Joern Server的原始响应
+                raw_result = get_res.json()
                 logger.debug(f"查询成功完成: {query[:50]}...")
-                return result
+
+                # 检查Joern Server的错误响应
+                if "err" in raw_result:
+                    # Joern Server返回错误
+                    error_msg = raw_result["err"]
+                    logger.error(f"Joern Server error: {error_msg}")
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"Joern Error: {error_msg}",
+                    }
+
+                # Joern Server返回格式: {"success": true, "uuid": "...", "stdout": "..."}
+                # cpgqls-client返回格式: {"success": True, "stdout": "...", "stderr": ""}
+                # 提取stdout字段（Scala REPL输出）
+                stdout_content = raw_result.get("stdout", "")
+
+                return {
+                    "success": True,
+                    "stdout": stdout_content,
+                    "stderr": "",
+                }
 
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
             # 返回错误格式与cpgqls-client一致
             return {
                 "success": False,
-                "error": str(e),
+                "stdout": "",
                 "stderr": f"Execution Error: {e}",
             }
 
@@ -159,11 +220,12 @@ class JoernHTTPClient:
             project_name: 项目名称
 
         Returns:
-            导入结果
+            导入结果（格式与cpgqls-client一致）
         """
         # 使用importCode查询
         query = f'importCode(inputPath="{path}", projectName="{project_name}")'
         logger.info(f"Importing code: {path} as {project_name}")
+        # execute已经返回统一格式，直接返回即可
         return await self.execute(query)
 
     async def workspace(self) -> dict[str, Any]:
@@ -171,8 +233,9 @@ class JoernHTTPClient:
         获取workspace信息
 
         Returns:
-            Workspace信息
+            Workspace信息（格式与cpgqls-client一致）
         """
+        # execute已经返回统一格式，直接返回即可
         return await self.execute("workspace")
 
     async def close(self) -> None:
