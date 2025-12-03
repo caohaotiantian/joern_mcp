@@ -146,17 +146,11 @@ class OptimizedQueryExecutor:
                     if complexity_info["complexity"] >= 7:
                         timeout_val = int(timeout_val * 1.5)
 
-                    # 优先使用异步方法
-                    if hasattr(self.server_manager, "execute_query_async"):
-                        result = await asyncio.wait_for(
-                            self.server_manager.execute_query_async(query),
-                            timeout=timeout_val,
-                        )
-                    else:
-                        result = await asyncio.wait_for(
-                            asyncio.to_thread(self.server_manager.execute_query, query),
-                            timeout=timeout_val,
-                        )
+                    # 使用异步方法执行查询
+                    result = await asyncio.wait_for(
+                        self.server_manager.execute_query_async(query),
+                        timeout=timeout_val,
+                    )
                 finally:
                     self.metrics.current_concurrent -= 1
 

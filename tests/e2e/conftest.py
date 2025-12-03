@@ -16,7 +16,7 @@ from joern_mcp.utils.port_utils import find_free_port
 def joern_server():
     """启动Joern服务器供E2E测试使用（session级别）"""
     port = find_free_port(start_port=35000, end_port=35100)
-    manager = JoernServerManager(port=port, use_http_client=True)
+    manager = JoernServerManager(port=port)
 
     # 启动服务器
     async def start_server():

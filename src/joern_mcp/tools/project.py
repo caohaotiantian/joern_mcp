@@ -1,6 +1,8 @@
-"""项目管理MCP工具"""
+"""项目管理MCP工具
 
-import asyncio
+所有与Joern Server的交互都使用异步HTTP+WebSocket方式。
+"""
+
 from pathlib import Path
 
 from loguru import logger
@@ -46,9 +48,9 @@ async def parse_project(
         project_name = path.name
 
     try:
-        # 导入代码
-        result = await asyncio.to_thread(
-            server_state.joern_server.import_code, str(path.absolute()), project_name
+        # 导入代码（使用异步方法）
+        result = await server_state.joern_server.import_code(
+            str(path.absolute()), project_name
         )
 
         if result.get("success"):
@@ -90,11 +92,9 @@ async def list_projects() -> dict:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
-        # 执行workspace查询
-        from cpgqls_client import workspace_query
-
-        query = workspace_query()
-        result = server_state.joern_server.execute_query(query)
+        # 执行workspace查询（使用异步方法）
+        query = "workspace"
+        result = await server_state.joern_server.execute_query_async(query)
 
         if result.get("success"):
             # 解析workspace输出
@@ -131,9 +131,9 @@ async def delete_project(project_name: str) -> dict:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
-        # Joern的close命令
+        # Joern的close命令（使用异步方法）
         query = f'close("{project_name}")'
-        result = server_state.joern_server.execute_query(query)
+        result = await server_state.joern_server.execute_query_async(query)
 
         if result.get("success"):
             logger.info(f"Project {project_name} deleted")

@@ -21,7 +21,7 @@ async def test_http_client():
     logger.info(f"使用端口: {port}")
 
     # 启动Joern Server
-    server = JoernServerManager(host="localhost", port=port, use_http_client=True)
+    server = JoernServerManager(host="localhost", port=port)
 
     try:
         logger.info("🚀 启动Joern Server...")

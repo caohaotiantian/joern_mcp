@@ -1,8 +1,11 @@
-"""Joern Server管理"""
+"""Joern Server管理
+
+统一使用HTTP+WebSocket方式与Joern Server交互，
+不再使用cpgqls-client的同步方法，避免event loop冲突。
+"""
 
 import asyncio
 
-from cpgqls_client import CPGQLSClient, import_code_query
 from loguru import logger
 
 from joern_mcp.config import settings
@@ -18,23 +21,25 @@ class JoernServerError(Exception):
 
 
 class JoernServerManager:
-    """Joern Server生命周期管理"""
+    """Joern Server生命周期管理
+
+    使用HTTP+WebSocket方式与Joern Server交互，
+    完全异步，不会阻塞event loop。
+    """
 
     def __init__(
         self,
         host: str | None = None,
         port: int | None = None,
         joern_manager: JoernManager | None = None,
-        use_http_client: bool = True,  # 默认使用HTTP客户端（已修复，稳定工作）
     ) -> None:
         self.host = host or settings.joern_server_host
         self.port = port or settings.joern_server_port
         self.endpoint = f"{self.host}:{self.port}"
         self.joern_manager = joern_manager or JoernManager()
-        self.use_http_client = use_http_client  # 选择客户端类型
 
         self.process: asyncio.subprocess.Process | None = None
-        self.client: CPGQLSClient | JoernHTTPClient | None = None
+        self.client: JoernHTTPClient | None = None
         self.auth_credentials: tuple[str, str] | None = None
 
     async def start(
@@ -96,19 +101,13 @@ class JoernServerManager:
             await self.stop()
             raise e
 
-        # 初始化客户端（HTTP或cpgqls-client）
-        if self.use_http_client:
-            self.client = JoernHTTPClient(
-                endpoint=self.endpoint,
-                auth=self.auth_credentials,
-                timeout=settings.query_timeout,
-            )
-            logger.info("Joern HTTP client initialized")
-        else:
-            self.client = CPGQLSClient(
-                self.endpoint, auth_credentials=self.auth_credentials
-            )
-            logger.info("Joern cpgqls client initialized")
+        # 初始化HTTP客户端（统一使用HTTP+WebSocket方式）
+        self.client = JoernHTTPClient(
+            endpoint=self.endpoint,
+            auth=self.auth_credentials,
+            timeout=settings.query_timeout,
+        )
+        logger.info("Joern HTTP client initialized")
 
     def is_running(self) -> bool:
         """检查服务器是否运行中"""
@@ -219,71 +218,42 @@ class JoernServerManager:
         await self.start()
 
     async def health_check(self) -> bool:
-        """健康检查"""
+        """健康检查（异步）"""
         if not self.client:
             return False
 
         try:
-            result = self.client.execute("1 + 1")
+            result = await self.client.execute("1 + 1")
             return result.get("success", False)
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False
 
-    def execute_query(self, query: str) -> dict:
-        """执行查询（同步）- 仅用于cpgqls-client"""
-        if not self.client:
-            raise JoernServerError("Server not started") from None
-
-        # HTTP客户端不支持同步调用
-        if isinstance(self.client, JoernHTTPClient):
-            raise JoernServerError(
-                "HTTP client requires async execution. Use execute_query_async() instead."
-            )
-
-        logger.debug(f"Executing query: {query[:100]}...")
-        try:
-            result = self.client.execute(query)
-            logger.debug(f"Query completed: success={result.get('success')}")
-            return result
-        except Exception as e:
-            logger.error(f"Query execution failed: {e}")
-            raise JoernServerError(f"Query failed: {e}") from None
-
     async def execute_query_async(self, query: str) -> dict:
-        """执行查询（异步）- 在已有event loop中使用"""
+        """执行查询（异步）
+
+        使用HTTP+WebSocket方式与Joern Server交互，
+        完全异步，不会阻塞event loop。
+        """
         if not self.client:
             raise JoernServerError("Server not started") from None
 
         logger.debug(f"Executing query (async): {query[:100]}...")
 
-        # 如果是HTTP客户端，直接异步调用
-        if isinstance(self.client, JoernHTTPClient):
-            try:
-                result = await self.client.execute(query)
-                return result
-            except Exception as e:
-                logger.error(f"HTTP query execution failed: {e}")
-                raise JoernServerError(f"Query failed: {e}") from None
-        else:
-            # cpgqls-client需要在线程池中运行
-            import concurrent.futures
-
-            loop = asyncio.get_event_loop()
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                try:
-                    result = await loop.run_in_executor(executor, self.execute_query, query)
-                    return result
-                except Exception as e:
-                    logger.error(f"Async query execution failed: {e}")
-                    raise JoernServerError(f"Query failed: {e}") from None
+        try:
+            result = await self.client.execute(query)
+            return result
+        except Exception as e:
+            logger.error(f"Query execution failed: {e}")
+            raise JoernServerError(f"Query failed: {e}") from None
 
     async def import_code(self, source_path: str, project_name: str) -> dict:
         """导入代码生成CPG"""
         logger.info(f"Importing code from {source_path} as {project_name}")
-        query = import_code_query(source_path, project_name)
 
-        # 使用异步方法（兼容HTTP和cpgqls-client）
+        # 构建importCode查询（不再依赖cpgqls_client）
+        query = f'importCode(inputPath="{source_path}", projectName="{project_name}")'
+
         result = await self.execute_query_async(query)
 
         if result.get("success"):

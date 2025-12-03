@@ -82,18 +82,11 @@ class QueryExecutor:
             try:
                 timeout_val = timeout or settings.query_timeout
 
-                # 优先使用异步方法（避免event loop冲突）
-                if hasattr(self.server_manager, "execute_query_async"):
-                    result = await asyncio.wait_for(
-                        self.server_manager.execute_query_async(query),
-                        timeout=timeout_val,
-                    )
-                else:
-                    # 回退到同步方法（在线程中运行）
-                    result = await asyncio.wait_for(
-                        asyncio.to_thread(self.server_manager.execute_query, query),
-                        timeout=timeout_val,
-                    )
+                # 使用异步方法执行查询
+                result = await asyncio.wait_for(
+                    self.server_manager.execute_query_async(query),
+                    timeout=timeout_val,
+                )
             except asyncio.TimeoutError:
                 logger.error(f"Query timeout after {timeout_val}s")
                 raise QueryExecutionError(
