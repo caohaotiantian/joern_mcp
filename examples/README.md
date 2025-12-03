@@ -7,7 +7,8 @@
 ```
 examples/
 ├── README.md                  # 本文件
-├── demo.py                    # 完整演示脚本
+├── demo.py                    # 直接 API 调用演示
+├── mcp_client_example.py      # MCP 客户端使用示例
 ├── scripts/                   # 安全分析脚本
 │   ├── README.md              # 脚本说明
 │   ├── analyze_command_injection.py   # 命令注入检测
@@ -88,6 +89,37 @@ python examples/demo.py
    - HIGH: 3 个
 ...
 ```
+
+## 🔌 MCP 客户端示例
+
+`mcp_client_example.py` 演示如何通过 MCP 协议与 Joern MCP Server 交互：
+
+### 使用 stdio 传输（自动启动服务器）
+
+```bash
+python examples/mcp_client_example.py
+```
+
+### 使用 HTTP 传输（需要先启动服务器）
+
+```bash
+# 终端 1: 启动服务器
+python -m joern_mcp
+
+# 终端 2: 运行客户端
+python examples/mcp_client_example.py http
+```
+
+该示例演示完整的分析流程：
+1. 健康检查
+2. 解析项目（构建 CPG）
+3. 列出函数
+4. 搜索危险函数
+5. 漏洞检测
+6. 污点流分析
+7. 自定义查询
+
+详细使用指南请参阅 [MCP 使用指南](../docs/MCP_USAGE_GUIDE.md)。
 
 ## 🔍 安全分析脚本
 

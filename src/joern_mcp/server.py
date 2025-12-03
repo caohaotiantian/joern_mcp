@@ -69,9 +69,20 @@ def main() -> None:
     """主函数"""
     # 导入所有工具模块以注册MCP工具（延迟导入避免循环依赖）
 
+    # 导入工具模块
     # 导入资源和提示模块
     from joern_mcp.prompts import analysis_prompts  # noqa: F401
     from joern_mcp.resources import project_resources  # noqa: F401
+    from joern_mcp.tools import (
+        batch,  # noqa: F401
+        callgraph,  # noqa: F401
+        cfg,  # noqa: F401
+        dataflow,  # noqa: F401
+        export,  # noqa: F401
+        project,  # noqa: F401
+        query,  # noqa: F401
+        taint,  # noqa: F401
+    )
 
     logger.info("=" * 60)
     logger.info("Joern MCP Server")
