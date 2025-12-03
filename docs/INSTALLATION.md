@@ -121,35 +121,95 @@ pytest tests/test_services -v --timeout=60
 
 ## ⚙️ 配置
 
-### 环境变量
+### 快速配置
 
-创建 `.env` 文件（或设置环境变量）：
+复制示例配置文件：
 
 ```bash
-# Joern Server配置
-JOERN_SERVER_HOST=localhost     # Joern服务器地址
-JOERN_SERVER_PORT=8080          # Joern服务器端口
-JOERN_SERVER_USERNAME=          # 可选：认证用户名
-JOERN_SERVER_PASSWORD=          # 可选：认证密码
-
-# 查询配置
-MAX_QUERY_TIMEOUT=300           # 查询超时时间（秒）
-ENABLE_CUSTOM_QUERIES=true      # 是否允许自定义查询
-
-# 日志配置
-LOG_LEVEL=INFO                  # 日志级别: DEBUG, INFO, WARNING, ERROR
-
-# 性能配置
-QUERY_CACHE_SIZE=1000           # 查询缓存大小
-MAX_CONCURRENT_QUERIES=5        # 最大并发查询数
+cp env.example .env
 ```
+
+### 配置项说明
+
+创建 `.env` 文件并根据需要修改：
+
+```bash
+# ============================================
+# Joern 服务器配置（必需）
+# ============================================
+JOERN_SERVER_HOST=localhost     # Joern 服务器地址
+JOERN_SERVER_PORT=8080          # Joern 服务器端口
+
+# 如果 Joern 服务器启用了认证（可选）
+# JOERN_SERVER_USERNAME=admin
+# JOERN_SERVER_PASSWORD=secret
+
+# ============================================
+# Joern 路径配置（可选）
+# ============================================
+# Joern 安装路径（默认从 PATH 查找）
+# JOERN_HOME=/usr/local/lib/joern
+
+# 工作空间路径（存放临时文件）
+# JOERN_WORKSPACE=~/.joern_mcp/workspace
+
+# CPG 缓存路径（存放生成的 CPG 文件）
+# JOERN_CPG_CACHE=~/.joern_mcp/cpg_cache
+
+# ============================================
+# 性能配置
+# ============================================
+MAX_CONCURRENT_QUERIES=5        # 最大并发查询数
+QUERY_TIMEOUT=300               # 查询超时时间（秒）
+QUERY_CACHE_SIZE=1000           # 查询结果缓存大小（条目数）
+QUERY_CACHE_TTL=3600            # 查询缓存 TTL（秒）
+
+# ============================================
+# 安全配置
+# ============================================
+ENABLE_CUSTOM_QUERIES=true      # 是否允许执行自定义 CPGQL 查询
+
+# ============================================
+# 日志配置
+# ============================================
+LOG_LEVEL=INFO                  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# LOG_FILE_PATH=~/.joern_mcp/logs  # 日志文件路径
+LOG_FILE_SIZE=500               # 日志文件大小限制（MB）
+LOG_RETENTION_DAYS=10           # 日志文件保留天数
+
+# ============================================
+# JVM 配置（可选，影响 Joern 性能）
+# ============================================
+# _JAVA_OPTIONS=-Xmx8G -Xms2G
+```
+
+### 配置项详解
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `JOERN_SERVER_HOST` | string | `localhost` | Joern 服务器地址 |
+| `JOERN_SERVER_PORT` | int | `8080` | Joern 服务器端口 |
+| `JOERN_SERVER_USERNAME` | string | - | 认证用户名（可选） |
+| `JOERN_SERVER_PASSWORD` | string | - | 认证密码（可选） |
+| `JOERN_HOME` | path | - | Joern 安装路径 |
+| `JOERN_WORKSPACE` | path | `~/.joern_mcp/workspace` | 工作空间路径 |
+| `JOERN_CPG_CACHE` | path | `~/.joern_mcp/cpg_cache` | CPG 缓存路径 |
+| `MAX_CONCURRENT_QUERIES` | int | `5` | 最大并发查询数 |
+| `QUERY_TIMEOUT` | int | `300` | 查询超时（秒） |
+| `QUERY_CACHE_SIZE` | int | `1000` | 查询缓存大小 |
+| `QUERY_CACHE_TTL` | int | `3600` | 缓存 TTL（秒） |
+| `ENABLE_CUSTOM_QUERIES` | bool | `true` | 允许自定义查询 |
+| `LOG_LEVEL` | string | `INFO` | 日志级别 |
+| `LOG_FILE_PATH` | path | `~/.joern_mcp/logs` | 日志文件路径 |
+| `LOG_FILE_SIZE` | int | `500` | 日志文件大小（MB） |
+| `LOG_RETENTION_DAYS` | int | `10` | 日志保留天数 |
 
 ### 配置文件位置
 
-配置文件按以下顺序加载：
+配置按以下优先级加载（后者覆盖前者）：
 
-1. `.env` 文件（项目根目录）
-2. `~/.joern_mcp/.env`（用户目录）
+1. 默认值（代码中定义）
+2. `.env` 文件（项目根目录）
 3. 环境变量（优先级最高）
 
 ---
@@ -299,21 +359,31 @@ pip install -e ".[dev]"
 对于大型代码库（>100K行），建议：
 
 ```bash
-# 增加内存
-export JAVA_OPTS="-Xmx16g"
+# 增加 JVM 内存
+export _JAVA_OPTIONS="-Xmx16g -Xms4g"
 
-# 增加超时
-MAX_QUERY_TIMEOUT=600 python -m joern_mcp
+# 增加查询超时时间
+QUERY_TIMEOUT=600 python -m joern_mcp
 
-# 启用查询缓存
+# 增大查询缓存
 QUERY_CACHE_SIZE=2000 python -m joern_mcp
+
+# 或组合配置
+QUERY_TIMEOUT=600 QUERY_CACHE_SIZE=2000 python -m joern_mcp
 ```
 
 ### 多项目分析
 
 ```bash
-# 限制并发
+# 限制并发数以避免资源竞争
 MAX_CONCURRENT_QUERIES=3 python -m joern_mcp
+```
+
+### 调试模式
+
+```bash
+# 启用详细日志
+LOG_LEVEL=DEBUG python -m joern_mcp
 ```
 
 ---
