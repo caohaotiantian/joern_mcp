@@ -18,20 +18,24 @@ class TestJoernServerManagerMock:
 
     def test_init(self):
         """测试初始化"""
-        with patch("shutil.which", return_value="/usr/local/bin/joern"):
-            with patch.object(Path, "exists", return_value=True):
-                manager = JoernServerManager(host="localhost", port=9999)
-                assert manager.host == "localhost"
-                assert manager.port == 9999
-                assert manager.endpoint == "localhost:9999"
+        with (
+            patch("shutil.which", return_value="/usr/local/bin/joern"),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            manager = JoernServerManager(host="localhost", port=9999)
+            assert manager.host == "localhost"
+            assert manager.port == 9999
+            assert manager.endpoint == "localhost:9999"
 
     def test_init_with_defaults(self):
         """测试使用默认值初始化"""
-        with patch("shutil.which", return_value="/usr/local/bin/joern"):
-            with patch.object(Path, "exists", return_value=True):
-                manager = JoernServerManager()
-                assert manager.host is not None
-                assert manager.port is not None
+        with (
+            patch("shutil.which", return_value="/usr/local/bin/joern"),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            manager = JoernServerManager()
+            assert manager.host is not None
+            assert manager.port is not None
 
     @pytest.mark.asyncio
     async def test_start_with_port_occupied(self):
@@ -144,25 +148,27 @@ class TestJoernServerManagerMock:
             assert not manager.is_running()
 
     @pytest.mark.asyncio
-    async def test_execute_query_sync(self):
-        """测试同步查询执行"""
+    async def test_execute_query_async(self):
+        """测试异步查询执行"""
+        from unittest.mock import AsyncMock
+
         with (
             patch("shutil.which", return_value="/usr/local/bin/joern"),
             patch.object(Path, "exists", return_value=True),
         ):
             manager = JoernServerManager()
 
-            # Mock client
+            # Mock client with async execute
             mock_client = MagicMock()
-            mock_client.execute = MagicMock(
-                return_value={"response": '["result"]', "success": True}
+            mock_client.execute = AsyncMock(
+                return_value={"success": True, "stdout": '["async_result"]', "stderr": ""}
             )
             manager.client = mock_client
 
-            result = manager.execute_query("test_query")
+            result = await manager.execute_query_async("async_query")
 
             assert result["success"] is True
-            assert mock_client.execute.called
+            mock_client.execute.assert_called_once_with("async_query")
 
     @pytest.mark.asyncio
     async def test_execute_query_without_client(self):
@@ -175,30 +181,13 @@ class TestJoernServerManagerMock:
             manager.client = None
 
             with pytest.raises(JoernServerError, match="Server not started"):
-                manager.execute_query("test")
-
-    @pytest.mark.asyncio
-    async def test_execute_query_async(self):
-        """测试异步查询执行"""
-        with (
-            patch("shutil.which", return_value="/usr/local/bin/joern"),
-            patch.object(Path, "exists", return_value=True),
-        ):
-            manager = JoernServerManager()
-
-            mock_client = MagicMock()
-            mock_client.execute = MagicMock(
-                return_value={"response": '["async_result"]', "success": True}
-            )
-            manager.client = mock_client
-
-            result = await manager.execute_query_async("async_query")
-
-            assert result["success"] is True
+                await manager.execute_query_async("test")
 
     @pytest.mark.asyncio
     async def test_health_check_running(self):
         """测试运行中服务器的健康检查"""
+        from unittest.mock import AsyncMock
+
         with (
             patch("shutil.which", return_value="/usr/local/bin/joern"),
             patch.object(Path, "exists", return_value=True),
@@ -211,9 +200,11 @@ class TestJoernServerManagerMock:
             mock_process.poll = MagicMock(return_value=None)
             manager.process = mock_process
 
-            # Mock client可用（返回正确的字典）
+            # Mock client可用（返回正确的字典，execute是async）
             mock_client = MagicMock()
-            mock_client.execute = MagicMock(return_value={"success": True})
+            mock_client.execute = AsyncMock(
+                return_value={"success": True, "stdout": "2", "stderr": ""}
+            )
             manager.client = mock_client
 
             is_healthy = await manager.health_check()
@@ -235,27 +226,25 @@ class TestJoernServerManagerMock:
     @pytest.mark.asyncio
     async def test_import_code_mock(self):
         """测试代码导入（Mock）"""
+        from unittest.mock import AsyncMock
+
         with (
             patch("shutil.which", return_value="/usr/local/bin/joern"),
             patch.object(Path, "exists", return_value=True),
         ):
             manager = JoernServerManager()
 
-            # Mock client
+            # Mock client with async execute
             mock_client = MagicMock()
-            mock_client.execute = MagicMock(
-                return_value={"response": "true", "success": True}
+            mock_client.execute = AsyncMock(
+                return_value={"success": True, "stdout": "true", "stderr": ""}
             )
             manager.client = mock_client
 
-            # Mock import_code_query
-            with patch(
-                "joern_mcp.joern.server.import_code_query", return_value="import_query"
-            ):
-                result = await manager.import_code("/path/to/code", "test_project")
+            result = await manager.import_code("/path/to/code", "test_project")
 
-                assert result["success"] is True
-                assert mock_client.execute.called
+            assert result["success"] is True
+            mock_client.execute.assert_called_once()
 
 
 class TestJoernServerErrorHandling:
@@ -283,6 +272,8 @@ class TestJoernServerErrorHandling:
     @pytest.mark.asyncio
     async def test_execute_query_client_error(self):
         """测试client执行查询出错"""
+        from unittest.mock import AsyncMock
+
         with (
             patch("shutil.which", return_value="/usr/local/bin/joern"),
             patch.object(Path, "exists", return_value=True),
@@ -290,15 +281,17 @@ class TestJoernServerErrorHandling:
             manager = JoernServerManager()
 
             mock_client = MagicMock()
-            mock_client.execute = MagicMock(side_effect=Exception("Client error"))
+            mock_client.execute = AsyncMock(side_effect=Exception("Client error"))
             manager.client = mock_client
 
             with pytest.raises(JoernServerError, match="Query failed"):
-                manager.execute_query("test")
+                await manager.execute_query_async("test")
 
     @pytest.mark.asyncio
     async def test_import_code_failure(self):
         """测试代码导入失败"""
+        from unittest.mock import AsyncMock
+
         with (
             patch("shutil.which", return_value="/usr/local/bin/joern"),
             patch.object(Path, "exists", return_value=True),
@@ -306,17 +299,14 @@ class TestJoernServerErrorHandling:
             manager = JoernServerManager()
 
             mock_client = MagicMock()
-            mock_client.execute = MagicMock(
+            mock_client.execute = AsyncMock(
                 return_value={
-                    "response": "false",
                     "success": False,
-                    "error": "Import failed",
+                    "stdout": "",
+                    "stderr": "Import failed",
                 }
             )
             manager.client = mock_client
 
-            with patch(
-                "joern_mcp.joern.server.import_code_query", return_value="import_query"
-            ):
-                result = await manager.import_code("/path", "project")
-                assert result["success"] is False
+            result = await manager.import_code("/path", "project")
+            assert result["success"] is False

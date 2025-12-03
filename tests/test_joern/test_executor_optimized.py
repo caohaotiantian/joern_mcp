@@ -355,19 +355,18 @@ class TestOptimizedQueryExecutor:
 
     @pytest.mark.asyncio
     async def test_without_async_method(self):
-        """测试不支持async方法的服务器"""
+        """测试不支持async方法的服务器 - 应该抛出错误"""
+        from joern_mcp.joern.executor_optimized import QueryExecutionError
+
         mock_server = MagicMock()
-        # 没有execute_query_async，只有execute_query
-        mock_server.execute_query = MagicMock(
-            return_value={"success": True, "stdout": "[]"}
-        )
+        # 没有execute_query_async方法
         del mock_server.execute_query_async
 
         executor = OptimizedQueryExecutor(mock_server)
 
-        # 应该使用同步方法的fallback
-        result = await executor.execute("test")
-        assert result["success"]
+        # 由于现在只支持异步方法，缺少execute_query_async应该导致错误
+        with pytest.raises(QueryExecutionError):
+            await executor.execute("test")
 
     @pytest.mark.asyncio
     async def test_cache_key_generation(self):

@@ -194,10 +194,12 @@ def test_joern_path_resolution_priority():
     """测试Joern路径解析优先级"""
 
     # 1. 优先从PATH查找
-    with patch("shutil.which", return_value="/usr/local/bin/joern"):
-        with patch.object(Path, "exists", return_value=True):
-            manager = JoernManager()
-            assert "/usr/local/bin/joern" in str(manager.joern_path)
+    with (
+        patch("shutil.which", return_value="/usr/local/bin/joern"),
+        patch.object(Path, "exists", return_value=True),
+    ):
+        manager = JoernManager()
+        assert "/usr/local/bin/joern" in str(manager.joern_path)
 
 
 def test_joern_not_found_in_all_locations(monkeypatch):

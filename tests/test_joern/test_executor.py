@@ -199,17 +199,14 @@ async def test_format_query():
 
 @pytest.mark.asyncio
 async def test_executor_without_async_method():
-    """测试不支持async方法的server"""
+    """测试不支持async方法的server - 应该抛出错误"""
 
     mock_server = MagicMock()
-    # 没有execute_query_async方法，只有execute_query
-    mock_server.execute_query = MagicMock(
-        return_value={"success": True, "stdout": "[]"}
-    )
-    del mock_server.execute_query_async  # 确保没有async方法
+    # 没有execute_query_async方法
+    del mock_server.execute_query_async
 
     executor = QueryExecutor(mock_server)
 
-    # 应该使用同步方法的fallback
-    result = await executor.execute("test_query")
-    assert result["success"]
+    # 由于现在只支持异步方法，缺少execute_query_async应该导致错误
+    with pytest.raises(QueryExecutionError):
+        await executor.execute("test_query")
