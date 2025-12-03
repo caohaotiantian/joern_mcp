@@ -88,4 +88,3 @@
 
 ---
 
-[0.1.0]: https://github.com/yourusername/joern_mcp/releases/tag/v0.1.0

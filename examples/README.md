@@ -6,10 +6,15 @@
 
 ```
 examples/
-├── README.md              # 本文件
-├── demo.py                # 完整演示脚本
-└── vulnerable_c/          # 示例漏洞C代码
-    └── vulnerable.c       # 包含多种漏洞的C代码
+├── README.md                  # 本文件
+├── demo.py                    # 完整演示脚本
+├── scripts/                   # 安全分析脚本
+│   ├── README.md              # 脚本说明
+│   ├── analyze_command_injection.py   # 命令注入检测
+│   ├── analyze_buffer_overflow.py     # 缓冲区溢出检测
+│   └── analyze_all_vulnerabilities.py # 综合安全扫描
+└── vulnerable_c/              # 示例漏洞C代码
+    └── vulnerable.c           # 包含多种漏洞的C代码
 ```
 
 ## 🚀 快速开始
@@ -83,6 +88,32 @@ python examples/demo.py
    - HIGH: 3 个
 ...
 ```
+
+## 🔍 安全分析脚本
+
+`scripts/` 目录包含独立的安全分析脚本：
+
+### 命令注入检测
+
+```bash
+python examples/scripts/analyze_command_injection.py examples/vulnerable_c
+```
+
+### 缓冲区溢出检测
+
+```bash
+python examples/scripts/analyze_buffer_overflow.py examples/vulnerable_c
+```
+
+### 综合安全扫描
+
+```bash
+python examples/scripts/analyze_all_vulnerabilities.py examples/vulnerable_c
+```
+
+综合扫描会生成 JSON 格式的详细报告。
+
+详细说明请参阅 [scripts/README.md](scripts/README.md)。
 
 ## 🛠️ 自定义演示
 
