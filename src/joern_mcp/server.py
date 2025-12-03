@@ -79,6 +79,7 @@ def main() -> None:
         cfg,  # noqa: F401
         dataflow,  # noqa: F401
         export,  # noqa: F401
+        performance,  # noqa: F401
         project,  # noqa: F401
         query,  # noqa: F401
         taint,  # noqa: F401
