@@ -1,4 +1,11 @@
-"""污点分析MCP工具"""
+"""污点分析MCP工具
+
+提供安全漏洞检测功能：
+- find_vulnerabilities: 查找安全漏洞
+- check_taint_flow: 检查自定义污点流
+- list_vulnerability_rules: 列出检测规则
+- get_rule_details: 获取规则详情
+"""
 
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.taint import TaintAnalysisService
@@ -20,12 +27,20 @@ async def find_vulnerabilities(
         dict: 漏洞列表和统计信息
 
     Example:
-        >>> await find_vulnerabilities(severity="CRITICAL")
+        >>> await find_vulnerabilities(severity="CRITICAL", max_flows=5)
         {
-            "success": True,
-            "vulnerabilities": [...],
-            "total_count": 5,
-            "summary": {"CRITICAL": 3, "HIGH": 2, ...}
+            "success": true,
+            "vulnerabilities": [
+                {
+                    "vulnerability": "Command Injection",
+                    "severity": "CRITICAL",
+                    "source": {"code": "input", "file": "main.c", "line": 10},
+                    "sink": {"code": "system(cmd)", "file": "main.c", "line": 25}
+                }
+            ],
+            "total_count": 1,
+            "summary": {"CRITICAL": 1, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+            "rules_checked": 6
         }
     """
     if not server_state.query_executor:
@@ -88,13 +103,23 @@ async def list_vulnerability_rules() -> dict:
     Example:
         >>> await list_vulnerability_rules()
         {
-            "success": True,
+            "success": true,
             "rules": [
                 {
                     "name": "Command Injection",
+                    "description": "用户输入未经验证直接传递到命令执行函数",
                     "severity": "CRITICAL",
                     "cwe_id": "CWE-78",
-                    ...
+                    "source_count": 18,
+                    "sink_count": 13
+                },
+                {
+                    "name": "SQL Injection",
+                    "description": "用户输入未经验证直接用于SQL查询",
+                    "severity": "CRITICAL",
+                    "cwe_id": "CWE-89",
+                    "source_count": 18,
+                    "sink_count": 8
                 }
             ],
             "count": 6
@@ -113,7 +138,7 @@ async def get_rule_details(rule_name: str) -> dict:
     获取特定规则的详细信息
 
     Args:
-        rule_name: 规则名称
+        rule_name: 规则名称（如 "Command Injection", "SQL Injection" 等）
 
     Returns:
         dict: 规则详细信息
@@ -121,13 +146,16 @@ async def get_rule_details(rule_name: str) -> dict:
     Example:
         >>> await get_rule_details("Command Injection")
         {
-            "success": True,
+            "success": true,
             "rule": {
                 "name": "Command Injection",
-                "description": "...",
+                "description": "用户输入未经验证直接传递到命令执行函数",
                 "severity": "CRITICAL",
-                "sources": [...],
-                "sinks": [...]
+                "cwe_id": "CWE-78",
+                "sources": ["gets", "scanf", "fgets", "argv", "getenv"],
+                "sinks": ["system", "exec", "popen", "Runtime.exec"],
+                "source_count": 18,
+                "sink_count": 13
             }
         }
     """

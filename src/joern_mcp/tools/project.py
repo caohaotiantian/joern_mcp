@@ -1,6 +1,13 @@
 """项目管理MCP工具
 
-所有与Joern Server的交互都使用异步HTTP+WebSocket方式。
+提供 CPG 项目管理功能：
+- parse_project: 解析代码生成 CPG
+- list_projects: 列出已解析的项目
+- delete_project: 删除项目
+
+所有与 Joern Server 的交互都通过异步 HTTP+WebSocket 方式进行。
+Joern Server 返回 JSON 格式：{"success": true, "uuid": "...", "stdout": "查询结果"}
+stdout 字段包含查询的实际输出（已清理 ANSI 颜色码）。
 """
 
 from pathlib import Path
@@ -78,15 +85,19 @@ async def list_projects() -> dict:
     列出所有已解析的项目
 
     Returns:
-        dict: 项目列表
+        dict: 工作空间信息
 
     Example:
         >>> await list_projects()
         {
             "success": True,
-            "projects": ["project1", "project2"],
-            "count": 2
+            "workspace_info": "WorkspaceManager(<project1>, <project2>)",
+            "raw_output": {...}
         }
+
+    Note:
+        workspace_info 包含 Joern 工作空间的文本表示。
+        如需结构化项目列表，请使用 project://list 资源。
     """
     if not server_state.joern_server:
         return {"success": False, "error": "Joern server not initialized"}

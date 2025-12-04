@@ -1,15 +1,21 @@
 """调用图分析服务"""
 
-import json
-
 from loguru import logger
 
 from joern_mcp.joern.executor import QueryExecutor
 from joern_mcp.joern.templates import QueryTemplates
+from joern_mcp.utils.response_parser import safe_parse_joern_response
 
 
 class CallGraphService:
-    """调用图分析服务"""
+    """调用图分析服务
+
+    提供函数调用关系分析：
+    - 获取调用者 (callers)
+    - 获取被调用者 (callees)
+    - 调用链追踪
+    - 完整调用图构建
+    """
 
     def __init__(self, query_executor: QueryExecutor):
         self.executor = query_executor
@@ -24,15 +30,30 @@ class CallGraphService:
 
         Returns:
             dict: 调用者列表
+
+        Example:
+            >>> result = await service.get_callers("vulnerable_func", depth=2)
+            {
+                "success": True,
+                "function": "vulnerable_func",
+                "depth": 2,
+                "callers": [
+                    {
+                        "name": "main",
+                        "signature": "int main(int argc, char** argv)",
+                        "filename": "main.c",
+                        "lineNumber": 10
+                    }
+                ],
+                "count": 1
+            }
         """
         logger.info(f"Getting callers for function: {function_name}")
 
         try:
             if depth == 1:
-                # 使用预定义模板
                 query = QueryTemplates.build("GET_CALLERS", name=function_name)
             else:
-                # 多层调用（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
                    .repeat(_.caller)(_.maxDepth({depth}))
@@ -49,53 +70,18 @@ class CallGraphService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+                callers = safe_parse_joern_response(stdout, default=[])
 
-                # 移除ANSI颜色码
-                import re
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+                if not isinstance(callers, list):
+                    callers = [callers] if callers else []
 
-                try:
-                    # 尝试解析JSON
-                    callers = json.loads(clean_output)
-                    # 处理双重编码
-                    if isinstance(callers, str):
-                        callers = json.loads(callers)
-                    return {
-                        "success": True,
-                        "function": function_name,
-                        "depth": depth,
-                        "callers": callers if isinstance(callers, list) else [callers] if callers else [],
-                        "count": len(callers) if isinstance(callers, list) else (1 if callers else 0),
-                    }
-                except json.JSONDecodeError:
-                    # 尝试从Scala REPL输出提取JSON
-                    match = re.search(r'=\s*(.+)$', clean_output)
-                    if match:
-                        try:
-                            json_str = match.group(1).strip()
-                            callers = json.loads(json_str)
-                            if isinstance(callers, str):
-                                callers = json.loads(callers)
-                            return {
-                                "success": True,
-                                "function": function_name,
-                                "depth": depth,
-                                "callers": callers if isinstance(callers, list) else [callers] if callers else [],
-                                "count": len(callers) if isinstance(callers, list) else (1 if callers else 0),
-                            }
-                        except (json.JSONDecodeError, AttributeError):
-                            pass
-
-                    # 解析失败，返回空结果而不是raw_output
-                    return {
-                        "success": True,
-                        "function": function_name,
-                        "depth": depth,
-                        "callers": [],
-                        "count": 0,
-                        "raw_output": stdout,
-                    }
+                return {
+                    "success": True,
+                    "function": function_name,
+                    "depth": depth,
+                    "callers": callers,
+                    "count": len(callers),
+                }
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -113,6 +99,29 @@ class CallGraphService:
 
         Returns:
             dict: 被调用函数列表
+
+        Example:
+            >>> result = await service.get_callees("main", depth=1)
+            {
+                "success": True,
+                "function": "main",
+                "depth": 1,
+                "callees": [
+                    {
+                        "name": "printf",
+                        "signature": "int printf(const char*, ...)",
+                        "filename": "<includes>",
+                        "lineNumber": -1
+                    },
+                    {
+                        "name": "strcpy",
+                        "signature": "char* strcpy(char*, const char*)",
+                        "filename": "<includes>",
+                        "lineNumber": -1
+                    }
+                ],
+                "count": 2
+            }
         """
         logger.info(f"Getting callees for function: {function_name}")
 
@@ -120,7 +129,6 @@ class CallGraphService:
             if depth == 1:
                 query = QueryTemplates.build("GET_CALLEES", name=function_name)
             else:
-                # 多层调用（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
                    .repeat(_.callee)(_.maxDepth({depth}))
@@ -137,53 +145,18 @@ class CallGraphService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+                callees = safe_parse_joern_response(stdout, default=[])
 
-                # 移除ANSI颜色码
-                import re
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+                if not isinstance(callees, list):
+                    callees = [callees] if callees else []
 
-                try:
-                    # 尝试解析JSON
-                    callees = json.loads(clean_output)
-                    # 处理双重编码
-                    if isinstance(callees, str):
-                        callees = json.loads(callees)
-                    return {
-                        "success": True,
-                        "function": function_name,
-                        "depth": depth,
-                        "callees": callees if isinstance(callees, list) else [callees] if callees else [],
-                        "count": len(callees) if isinstance(callees, list) else (1 if callees else 0),
-                    }
-                except json.JSONDecodeError:
-                    # 尝试从Scala REPL输出提取JSON
-                    match = re.search(r'=\s*(.+)$', clean_output)
-                    if match:
-                        try:
-                            json_str = match.group(1).strip()
-                            callees = json.loads(json_str)
-                            if isinstance(callees, str):
-                                callees = json.loads(callees)
-                            return {
-                                "success": True,
-                                "function": function_name,
-                                "depth": depth,
-                                "callees": callees if isinstance(callees, list) else [callees] if callees else [],
-                                "count": len(callees) if isinstance(callees, list) else (1 if callees else 0),
-                            }
-                        except (json.JSONDecodeError, AttributeError):
-                            pass
-
-                    # 解析失败，返回空结果
-                    return {
-                        "success": True,
-                        "function": function_name,
-                        "depth": depth,
-                        "callees": [],
-                        "count": 0,
-                        "raw_output": stdout,
-                    }
+                return {
+                    "success": True,
+                    "function": function_name,
+                    "depth": depth,
+                    "callees": callees,
+                    "count": len(callees),
+                }
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -204,6 +177,20 @@ class CallGraphService:
 
         Returns:
             dict: 调用链
+
+        Example:
+            >>> result = await service.get_call_chain("strcpy", direction="up", max_depth=3)
+            {
+                "success": True,
+                "function": "strcpy",
+                "direction": "up",
+                "max_depth": 3,
+                "chain": [
+                    {"name": "buffer_overflow", "filename": "vulnerable.c", "depth": "unknown"},
+                    {"name": "main", "filename": "main.c", "depth": "unknown"}
+                ],
+                "count": 2
+            }
         """
         logger.info(
             f"Getting call chain for function: {function_name}, direction: {direction}"
@@ -211,7 +198,6 @@ class CallGraphService:
 
         try:
             if direction == "up":
-                # 向上追踪调用者（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
                    .repeat(_.caller)(_.maxDepth({max_depth}))
@@ -223,7 +209,6 @@ class CallGraphService:
                    ))
                 '''
             else:
-                # 向下追踪被调用者（正确的repeat语法：_.maxDepth(n)）
                 query = f'''
                 cpg.method.name("{function_name}")
                    .repeat(_.callee)(_.maxDepth({max_depth}))
@@ -239,57 +224,19 @@ class CallGraphService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+                chain = safe_parse_joern_response(stdout, default=[])
 
-                # 移除ANSI颜色码
-                import re
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+                if not isinstance(chain, list):
+                    chain = [chain] if chain else []
 
-                try:
-                    # 尝试直接解析JSON
-                    chain = json.loads(clean_output)
-                    # 如果chain是字符串（双重JSON编码），再解析一次
-                    if isinstance(chain, str):
-                        chain = json.loads(chain)
-                    return {
-                        "success": True,
-                        "function": function_name,
-                        "direction": direction,
-                        "max_depth": max_depth,
-                        "chain": chain if isinstance(chain, list) else [chain],
-                        "count": len(chain) if isinstance(chain, list) else 1,
-                    }
-                except json.JSONDecodeError:
-                    # 尝试从Scala REPL输出提取JSON: val res1: String = "[]"
-                    match = re.search(r'=\s*(.+)$', clean_output)
-                    if match:
-                        try:
-                            json_str = match.group(1).strip()
-                            chain = json.loads(json_str)
-                            # 双重解码
-                            if isinstance(chain, str):
-                                chain = json.loads(chain)
-                            return {
-                                "success": True,
-                                "function": function_name,
-                                "direction": direction,
-                                "max_depth": max_depth,
-                                "chain": chain if isinstance(chain, list) else [chain],
-                                "count": len(chain) if isinstance(chain, list) else 1,
-                            }
-                        except (json.JSONDecodeError, AttributeError):
-                            pass
-
-                    # 解析失败，返回空chain
-                    return {
-                        "success": True,
-                        "function": function_name,
-                        "direction": direction,
-                        "max_depth": max_depth,
-                        "chain": [],
-                        "count": 0,
-                        "raw_output": stdout,
-                    }
+                return {
+                    "success": True,
+                    "function": function_name,
+                    "direction": direction,
+                    "max_depth": max_depth,
+                    "chain": chain,
+                    "count": len(chain),
+                }
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -314,7 +261,25 @@ class CallGraphService:
             depth: 深度
 
         Returns:
-            dict: 调用图数据
+            dict: 调用图数据（节点和边）
+
+        Example:
+            >>> result = await service.get_call_graph("process_data", depth=2)
+            {
+                "success": True,
+                "function": "process_data",
+                "nodes": [
+                    {"id": "main", "type": "caller", "filename": "main.c", "lineNumber": 10},
+                    {"id": "process_data", "type": "target", "filename": "", "lineNumber": -1},
+                    {"id": "validate", "type": "callee", "filename": "utils.c", "lineNumber": 50}
+                ],
+                "edges": [
+                    {"from": "main", "to": "process_data", "type": "calls"},
+                    {"from": "process_data", "to": "validate", "type": "calls"}
+                ],
+                "node_count": 3,
+                "edge_count": 2
+            }
         """
         logger.info(f"Building call graph for function: {function_name}")
 
@@ -325,57 +290,45 @@ class CallGraphService:
             if include_callers:
                 callers_result = await self.get_callers(function_name, depth)
                 if callers_result.get("success"):
-                    callers = callers_result.get("callers", [])
-                    for caller in callers:
+                    for caller in callers_result.get("callers", []):
                         if isinstance(caller, dict):
-                            graph["nodes"].append(
-                                {
-                                    "id": caller.get("name", "unknown"),
-                                    "type": "caller",
-                                    "filename": caller.get("filename", ""),
-                                    "lineNumber": caller.get("lineNumber", -1),
-                                }
-                            )
-                            graph["edges"].append(
-                                {
-                                    "from": caller.get("name", "unknown"),
-                                    "to": function_name,
-                                    "type": "calls",
-                                }
-                            )
+                            graph["nodes"].append({
+                                "id": caller.get("name", "unknown"),
+                                "type": "caller",
+                                "filename": caller.get("filename", ""),
+                                "lineNumber": caller.get("lineNumber", -1),
+                            })
+                            graph["edges"].append({
+                                "from": caller.get("name", "unknown"),
+                                "to": function_name,
+                                "type": "calls",
+                            })
 
             # 添加目标函数
-            graph["nodes"].append(
-                {
-                    "id": function_name,
-                    "type": "target",
-                    "filename": "",
-                    "lineNumber": -1,
-                }
-            )
+            graph["nodes"].append({
+                "id": function_name,
+                "type": "target",
+                "filename": "",
+                "lineNumber": -1,
+            })
 
             # 获取被调用者
             if include_callees:
                 callees_result = await self.get_callees(function_name, depth)
                 if callees_result.get("success"):
-                    callees = callees_result.get("callees", [])
-                    for callee in callees:
+                    for callee in callees_result.get("callees", []):
                         if isinstance(callee, dict):
-                            graph["nodes"].append(
-                                {
-                                    "id": callee.get("name", "unknown"),
-                                    "type": "callee",
-                                    "filename": callee.get("filename", ""),
-                                    "lineNumber": callee.get("lineNumber", -1),
-                                }
-                            )
-                            graph["edges"].append(
-                                {
-                                    "from": function_name,
-                                    "to": callee.get("name", "unknown"),
-                                    "type": "calls",
-                                }
-                            )
+                            graph["nodes"].append({
+                                "id": callee.get("name", "unknown"),
+                                "type": "callee",
+                                "filename": callee.get("filename", ""),
+                                "lineNumber": callee.get("lineNumber", -1),
+                            })
+                            graph["edges"].append({
+                                "from": function_name,
+                                "to": callee.get("name", "unknown"),
+                                "type": "calls",
+                            })
 
             # 去重节点
             seen = set()

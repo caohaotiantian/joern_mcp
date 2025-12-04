@@ -42,5 +42,7 @@ def test_path_settings():
 def test_security_settings():
     """测试安全配置"""
     settings = Settings()
-    assert isinstance(settings.allowed_paths, list)
+    # enable_custom_queries 控制是否允许自定义查询
     assert isinstance(settings.enable_custom_queries, bool)
+    # 默认值应该为 True
+    assert settings.enable_custom_queries is True

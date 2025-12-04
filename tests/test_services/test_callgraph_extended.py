@@ -17,7 +17,7 @@ class TestCallGraphServiceExtended:
 
     @pytest.mark.asyncio
     async def test_get_callers_json_decode_error(self, mock_query_executor):
-        """测试get_callers JSON解析失败"""
+        """测试get_callers JSON解析失败 - 返回空列表"""
         service = CallGraphService(mock_query_executor)
 
         # Mock返回无效JSON
@@ -27,13 +27,14 @@ class TestCallGraphServiceExtended:
 
         result = await service.get_callers("test_func")
 
-        # 应该返回raw_output
+        # 解析失败时返回空列表（使用safe_parse_joern_response的默认值）
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["callers"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_get_callees_json_decode_error(self, mock_query_executor):
-        """测试get_callees JSON解析失败"""
+        """测试get_callees JSON解析失败 - 返回空列表"""
         service = CallGraphService(mock_query_executor)
 
         mock_query_executor.execute = AsyncMock(
@@ -42,12 +43,14 @@ class TestCallGraphServiceExtended:
 
         result = await service.get_callees("test_func")
 
+        # 解析失败时返回空列表
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["callees"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_get_call_chain_json_decode_error(self, mock_query_executor):
-        """测试get_call_chain JSON解析失败"""
+        """测试get_call_chain JSON解析失败 - 返回空列表"""
         service = CallGraphService(mock_query_executor)
 
         mock_query_executor.execute = AsyncMock(
@@ -56,8 +59,10 @@ class TestCallGraphServiceExtended:
 
         result = await service.get_call_chain("func_a")
 
+        # 解析失败时返回空列表
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["chain"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_get_call_graph(self, mock_query_executor):

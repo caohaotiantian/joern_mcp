@@ -14,12 +14,29 @@ Joern Server工作模式（参考cpgqls-client实现）：
 """
 
 import asyncio
+import re
 import time
 from typing import Any
 
 import requests  # 使用同步requests，与cpgqls-client一致
 import websockets
 from loguru import logger
+
+# ANSI 颜色控制码正则表达式
+_ANSI_ESCAPE_PATTERN = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+
+def strip_ansi_codes(text: str) -> str:
+    """
+    移除字符串中的 ANSI 颜色控制码
+
+    Args:
+        text: 可能包含 ANSI 颜色码的文本
+
+    Returns:
+        清理后的纯文本
+    """
+    return _ANSI_ESCAPE_PATTERN.sub('', text)
 
 # 全局信号量：限制并发WebSocket连接数，避免资源竞争
 _connection_semaphore: asyncio.Semaphore | None = None
@@ -192,13 +209,16 @@ class JoernHTTPClient:
                     }
 
                 # Joern Server返回格式: {"success": true, "uuid": "...", "stdout": "..."}
-                # cpgqls-client返回格式: {"success": True, "stdout": "...", "stderr": ""}
-                # 提取stdout字段（Scala REPL输出）
+                # stdout 包含 Scala REPL 风格输出，可能有 ANSI 颜色码
+                # 统一在此处清理，下游代码无需重复处理
                 stdout_content = raw_result.get("stdout", "")
+
+                # 移除 ANSI 颜色控制码
+                clean_stdout = strip_ansi_codes(stdout_content)
 
                 return {
                     "success": True,
-                    "stdout": stdout_content,
+                    "stdout": clean_stdout,
                     "stderr": "",
                 }
 

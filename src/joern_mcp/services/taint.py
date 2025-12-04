@@ -1,6 +1,10 @@
-"""污点分析服务"""
+"""污点分析服务
 
-import json
+识别和追踪安全漏洞：
+- analyze_with_rule: 使用特定规则进行污点分析
+- find_vulnerabilities: 查找代码中的漏洞
+- check_specific_flow: 检查自定义的污点流
+"""
 
 from loguru import logger
 
@@ -12,6 +16,7 @@ from joern_mcp.models.taint_rules import (
     get_rules_by_severity,
     list_all_rules,
 )
+from joern_mcp.utils.response_parser import safe_parse_joern_response
 
 
 class TaintAnalysisService:
@@ -30,11 +35,27 @@ class TaintAnalysisService:
 
         Returns:
             dict: 分析结果
+
+        Example:
+            >>> result = await service.analyze_with_rule(command_injection_rule)
+            {
+                "success": True,
+                "rule": "Command Injection",
+                "severity": "CRITICAL",
+                "cwe_id": "CWE-78",
+                "vulnerabilities": [
+                    {
+                        "vulnerability": "Command Injection",
+                        "source": {"code": "input", "file": "main.c", "line": 5},
+                        "sink": {"code": "system(cmd)", "file": "main.c", "line": 20}
+                    }
+                ],
+                "count": 1
+            }
         """
         logger.info(f"Running taint analysis with rule: {rule.name}")
 
         try:
-            # 构建污点分析查询
             source_pattern = "|".join(rule.sources)
             sink_pattern = "|".join(rule.sinks)
 
@@ -71,59 +92,19 @@ class TaintAnalysisService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+                flows = safe_parse_joern_response(stdout, default=[])
 
-                # 移除ANSI颜色码
-                import re
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+                if not isinstance(flows, list):
+                    flows = [flows] if flows else []
 
-                try:
-                    # 尝试直接解析JSON
-                    flows = json.loads(clean_output)
-                    # 处理双重编码
-                    if isinstance(flows, str):
-                        flows = json.loads(flows)
-                    return {
-                        "success": True,
-                        "rule": rule.name,
-                        "severity": rule.severity,
-                        "cwe_id": rule.cwe_id,
-                        "vulnerabilities": flows
-                        if isinstance(flows, list)
-                        else [flows]
-                        if flows
-                        else [],
-                        "count": len(flows)
-                        if isinstance(flows, list)
-                        else (1 if flows else 0),
-                    }
-                except json.JSONDecodeError:
-                    # 尝试从Scala REPL输出提取JSON
-                    match = re.search(r'=\s*(.+)$', clean_output)
-                    if match:
-                        try:
-                            json_str = match.group(1).strip()
-                            flows = json.loads(json_str)
-                            if isinstance(flows, str):
-                                flows = json.loads(flows)
-                            return {
-                                "success": True,
-                                "rule": rule.name,
-                                "severity": rule.severity,
-                                "cwe_id": rule.cwe_id,
-                                "vulnerabilities": flows
-                                if isinstance(flows, list)
-                                else [flows]
-                                if flows
-                                else [],
-                                "count": len(flows)
-                                if isinstance(flows, list)
-                                else (1 if flows else 0),
-                            }
-                        except (json.JSONDecodeError, AttributeError):
-                            pass
-
-                    return {"success": True, "rule": rule.name, "raw_output": stdout}
+                return {
+                    "success": True,
+                    "rule": rule.name,
+                    "severity": rule.severity,
+                    "cwe_id": rule.cwe_id,
+                    "vulnerabilities": flows,
+                    "count": len(flows),
+                }
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -147,13 +128,22 @@ class TaintAnalysisService:
 
         Returns:
             dict: 漏洞列表
+
+        Example:
+            >>> result = await service.find_vulnerabilities(severity="CRITICAL")
+            {
+                "success": True,
+                "vulnerabilities": [...],
+                "total_count": 5,
+                "summary": {"CRITICAL": 3, "HIGH": 2, "MEDIUM": 0, "LOW": 0},
+                "rules_checked": 6
+            }
         """
         logger.info(
             f"Finding vulnerabilities (rule: {rule_name}, severity: {severity})"
         )
 
         try:
-            # 确定要使用的规则
             if rule_name:
                 rules = [get_rule_by_name(rule_name)]
             elif severity:
@@ -164,7 +154,6 @@ class TaintAnalysisService:
             all_vulnerabilities = []
             summary = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
 
-            # 对每个规则进行分析
             for rule in rules:
                 result = await self.analyze_with_rule(rule, max_flows)
 
@@ -192,12 +181,29 @@ class TaintAnalysisService:
         检查特定的污点流
 
         Args:
-            source_pattern: 源模式（正则表达式）
-            sink_pattern: 汇模式（正则表达式）
+            source_pattern: 源模式（正则表达式，如 "gets|scanf"）
+            sink_pattern: 汇模式（正则表达式，如 "system|exec"）
             max_flows: 最大流数量
 
         Returns:
             dict: 污点流信息
+
+        Example:
+            >>> result = await service.check_specific_flow("gets", "system")
+            {
+                "success": True,
+                "source_pattern": "gets",
+                "sink_pattern": "system",
+                "flows": [
+                    {
+                        "source": {"code": "input", "file": "main.c", "line": 5},
+                        "sink": {"code": "system(cmd)", "file": "main.c", "line": 20},
+                        "pathLength": 4,
+                        "path": [...]
+                    }
+                ],
+                "count": 1
+            }
         """
         logger.info(f"Checking taint flow: {source_pattern} -> {sink_pattern}")
 
@@ -236,57 +242,18 @@ class TaintAnalysisService:
 
             if result.get("success"):
                 stdout = result.get("stdout", "")
+                flows = safe_parse_joern_response(stdout, default=[])
 
-                # 移除ANSI颜色码
-                import re
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+                if not isinstance(flows, list):
+                    flows = [flows] if flows else []
 
-                try:
-                    # 尝试直接解析JSON
-                    flows = json.loads(clean_output)
-                    # 处理双重编码
-                    if isinstance(flows, str):
-                        flows = json.loads(flows)
-                    return {
-                        "success": True,
-                        "source_pattern": source_pattern,
-                        "sink_pattern": sink_pattern,
-                        "flows": flows
-                        if isinstance(flows, list)
-                        else [flows]
-                        if flows
-                        else [],
-                        "count": len(flows)
-                        if isinstance(flows, list)
-                        else (1 if flows else 0),
-                    }
-                except json.JSONDecodeError:
-                    # 尝试从Scala REPL输出提取JSON
-                    match = re.search(r'=\s*(.+)$', clean_output)
-                    if match:
-                        try:
-                            json_str = match.group(1).strip()
-                            flows = json.loads(json_str)
-                            if isinstance(flows, str):
-                                flows = json.loads(flows)
-                            return {
-                                "success": True,
-                                "source_pattern": source_pattern,
-                                "sink_pattern": sink_pattern,
-                                "flows": flows
-                                if isinstance(flows, list)
-                                else [flows]
-                                if flows
-                                else [],
-                                "count": len(flows)
-                                if isinstance(flows, list)
-                                else (1 if flows else 0),
-                            }
-                        except (json.JSONDecodeError, AttributeError):
-                            pass
-
-                    return {"success": True, "raw_output": stdout}
+                return {
+                    "success": True,
+                    "source_pattern": source_pattern,
+                    "sink_pattern": sink_pattern,
+                    "flows": flows,
+                    "count": len(flows),
+                }
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -295,7 +262,24 @@ class TaintAnalysisService:
             return {"success": False, "error": str(e)}
 
     def list_rules(self) -> dict:
-        """列出所有可用的规则"""
+        """
+        列出所有可用的规则
+
+        Returns:
+            dict: 规则列表
+
+        Example:
+            >>> result = service.list_rules()
+            {
+                "success": True,
+                "rules": [
+                    {"name": "Command Injection", "severity": "CRITICAL", "cwe_id": "CWE-78"},
+                    {"name": "SQL Injection", "severity": "CRITICAL", "cwe_id": "CWE-89"},
+                    ...
+                ],
+                "count": 6
+            }
+        """
         return {
             "success": True,
             "rules": list_all_rules(),
@@ -303,7 +287,31 @@ class TaintAnalysisService:
         }
 
     def get_rule_details(self, rule_name: str) -> dict:
-        """获取规则详情"""
+        """
+        获取规则详情
+
+        Args:
+            rule_name: 规则名称
+
+        Returns:
+            dict: 规则详细信息
+
+        Example:
+            >>> result = service.get_rule_details("Command Injection")
+            {
+                "success": True,
+                "rule": {
+                    "name": "Command Injection",
+                    "description": "Untrusted data flows to command execution",
+                    "severity": "CRITICAL",
+                    "cwe_id": "CWE-78",
+                    "sources": ["gets", "scanf", "argv"],
+                    "sinks": ["system", "exec", "popen"],
+                    "source_count": 3,
+                    "sink_count": 3
+                }
+            }
+        """
         try:
             rule = get_rule_by_name(rule_name)
             return {

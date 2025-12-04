@@ -1,4 +1,11 @@
-"""调用图分析MCP工具"""
+"""调用图分析MCP工具
+
+提供调用图分析功能：
+- get_callers: 获取函数的调用者
+- get_callees: 获取函数调用的其他函数
+- get_call_chain: 获取函数的调用链
+- get_call_graph: 获取完整调用图
+"""
 
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.callgraph import CallGraphService
@@ -17,12 +24,25 @@ async def get_callers(function_name: str, depth: int = 1) -> dict:
         dict: 调用者列表
 
     Example:
-        >>> await get_callers("vulnerable_function", depth=2)
+        >>> await get_callers("buffer_overflow", depth=2)
         {
-            "success": True,
-            "function": "vulnerable_function",
-            "callers": [{"name": "main", "filename": "main.c", ...}],
-            "count": 1
+            "success": true,
+            "function": "buffer_overflow",
+            "depth": 2,
+            "callers": [
+                {
+                    "name": "process_data",
+                    "signature": "void(char*)",
+                    "filename": "vulnerable.c",
+                    "lineNumber": 127
+                },
+                {
+                    "name": "main",
+                    "filename": "vulnerable.c",
+                    "lineNumber": 145
+                }
+            ],
+            "count": 2
         }
     """
     if not server_state.query_executor:
@@ -48,13 +68,21 @@ async def get_callees(function_name: str, depth: int = 1) -> dict:
         dict: 被调用函数列表
 
     Example:
-        >>> await get_callees("main", depth=2)
+        >>> await get_callees("buffer_overflow", depth=1)
         {
-            "success": True,
-            "function": "main",
-            "callees": [{"name": "printf", "filename": "stdio.h", ...}],
-            "count": 5
+            "success": true,
+            "function": "buffer_overflow",
+            "depth": 1,
+            "callees": [
+                {"name": "strcpy", "filename": "<empty>", "lineNumber": -1},
+                {"name": "printf", "filename": "<empty>", "lineNumber": -1},
+                {"name": "<operator>.alloc", "filename": "<empty>", "lineNumber": -1}
+            ],
+            "count": 3
         }
+
+    Note:
+        外部库函数（如 strcpy, printf）的 filename 为 "<empty>"
     """
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
@@ -82,13 +110,17 @@ async def get_call_chain(
         dict: 调用链数据
 
     Example:
-        >>> await get_call_chain("process_input", max_depth=5, direction="up")
+        >>> await get_call_chain("strcpy", max_depth=3, direction="up")
         {
-            "success": True,
-            "function": "process_input",
+            "success": true,
+            "function": "strcpy",
             "direction": "up",
-            "chain": [...],
-            "count": 3
+            "max_depth": 3,
+            "chain": [
+                {"name": "buffer_overflow", "filename": "vulnerable.c", "depth": "unknown"},
+                {"name": "main", "filename": "vulnerable.c", "depth": "unknown"}
+            ],
+            "count": 2
         }
     """
     if not server_state.query_executor:
@@ -124,14 +156,21 @@ async def get_call_graph(
         dict: 调用图数据（包含节点和边）
 
     Example:
-        >>> await get_call_graph("main", depth=2)
+        >>> await get_call_graph("buffer_overflow", depth=1)
         {
-            "success": True,
-            "function": "main",
-            "nodes": [{...}, {...}],
-            "edges": [{...}, {...}],
-            "node_count": 10,
-            "edge_count": 12
+            "success": true,
+            "function": "buffer_overflow",
+            "nodes": [
+                {"id": "main", "type": "caller", "filename": "vulnerable.c", "lineNumber": 145},
+                {"id": "buffer_overflow", "type": "target", "filename": "", "lineNumber": -1},
+                {"id": "strcpy", "type": "callee", "filename": "<empty>", "lineNumber": -1}
+            ],
+            "edges": [
+                {"from": "main", "to": "buffer_overflow", "type": "calls"},
+                {"from": "buffer_overflow", "to": "strcpy", "type": "calls"}
+            ],
+            "node_count": 3,
+            "edge_count": 2
         }
     """
     if not server_state.query_executor:

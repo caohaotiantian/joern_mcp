@@ -1,10 +1,15 @@
-"""代码查询MCP工具"""
+"""代码查询MCP工具
 
-import json
+提供代码搜索和函数分析功能：
+- get_function_code: 获取函数源代码
+- list_functions: 列出所有函数
+- search_code: 搜索代码模式
+"""
 
 from loguru import logger
 
 from joern_mcp.mcp_server import mcp, server_state
+from joern_mcp.utils.response_parser import safe_parse_joern_response
 
 
 @mcp.tool()
@@ -20,16 +25,19 @@ async def get_function_code(function_name: str, file_filter: str | None = None) 
         dict: 函数信息，包含源代码、位置等
 
     Example:
-        >>> await get_function_code("main")
+        >>> await get_function_code("buffer_overflow")
         {
-            "success": True,
-            "functions": [{
-                "name": "main",
-                "signature": "int main()",
-                "filename": "main.c",
-                "lineNumber": 10,
-                "code": "int main() { ... }"
-            }],
+            "success": true,
+            "functions": [
+                {
+                    "name": "buffer_overflow",
+                    "signature": "void(char*)",
+                    "filename": "vulnerable.c",
+                    "lineNumber": 25,
+                    "lineNumberEnd": 30,
+                    "code": "void buffer_overflow(char *input) {...}"
+                }
+            ],
             "count": 1
         }
     """
@@ -70,19 +78,17 @@ async def get_function_code(function_name: str, file_filter: str | None = None) 
         result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
-            # 解析JSON结果
             stdout = result.get("stdout", "")
-            try:
-                functions = json.loads(stdout)
-                return {
-                    "success": True,
-                    "functions": functions
-                    if isinstance(functions, list)
-                    else [functions],
-                    "count": len(functions) if isinstance(functions, list) else 1,
-                }
-            except json.JSONDecodeError:
-                return {"success": True, "raw_output": stdout}
+            functions = safe_parse_joern_response(stdout, default=[])
+
+            if not isinstance(functions, list):
+                functions = [functions] if functions else []
+
+            return {
+                "success": True,
+                "functions": functions,
+                "count": len(functions),
+            }
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -101,14 +107,18 @@ async def list_functions(name_filter: str | None = None, limit: int = 100) -> di
         limit: 返回数量限制（默认100）
 
     Returns:
-        dict: 函数列表
+        dict: 函数列表，每个函数包含名称、文件名和行号
 
     Example:
-        >>> await list_functions(name_filter=".*main.*", limit=10)
+        >>> await list_functions(limit=5)
         {
-            "success": True,
-            "functions": ["main", "main_helper"],
-            "count": 2
+            "success": true,
+            "functions": [
+                {"name": "command_injection", "filename": "vulnerable.c", "lineNumber": 15},
+                {"name": "buffer_overflow", "filename": "vulnerable.c", "lineNumber": 25},
+                {"name": "format_string", "filename": "vulnerable.c", "lineNumber": 35}
+            ],
+            "count": 3
         }
     """
     if not server_state.query_executor:
@@ -144,15 +154,16 @@ async def list_functions(name_filter: str | None = None, limit: int = 100) -> di
 
         if result.get("success"):
             stdout = result.get("stdout", "")
-            try:
-                functions = json.loads(stdout)
-                return {
-                    "success": True,
-                    "functions": functions,
-                    "count": len(functions) if isinstance(functions, list) else 1,
-                }
-            except json.JSONDecodeError:
-                return {"success": True, "raw_output": stdout}
+            functions = safe_parse_joern_response(stdout, default=[])
+
+            if not isinstance(functions, list):
+                functions = [functions] if functions else []
+
+            return {
+                "success": True,
+                "functions": functions,
+                "count": len(functions),
+            }
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -171,18 +182,22 @@ async def search_code(pattern: str, scope: str = "all") -> dict:
         scope: 搜索范围 (all, methods, calls, identifiers)
 
     Returns:
-        dict: 匹配结果
+        dict: 匹配结果，包含代码、类型、文件和行号
 
     Example:
         >>> await search_code("strcpy", scope="calls")
         {
-            "success": True,
-            "matches": [{
-                "code": "strcpy(dst, src)",
-                "filename": "main.c",
-                "lineNumber": 25
-            }],
-            "count": 1
+            "success": true,
+            "matches": [
+                {
+                    "code": "strcpy(buffer, input)",
+                    "type": "CALL",
+                    "file": "vulnerable.c",
+                    "line": 28
+                }
+            ],
+            "count": 1,
+            "scope": "calls"
         }
     """
     if not server_state.query_executor:
@@ -213,16 +228,17 @@ async def search_code(pattern: str, scope: str = "all") -> dict:
 
         if result.get("success"):
             stdout = result.get("stdout", "")
-            try:
-                matches = json.loads(stdout)
-                return {
-                    "success": True,
-                    "matches": matches,
-                    "count": len(matches) if isinstance(matches, list) else 1,
-                    "scope": scope,
-                }
-            except json.JSONDecodeError:
-                return {"success": True, "raw_output": stdout}
+            matches = safe_parse_joern_response(stdout, default=[])
+
+            if not isinstance(matches, list):
+                matches = [matches] if matches else []
+
+            return {
+                "success": True,
+                "matches": matches,
+                "count": len(matches),
+                "scope": scope,
+            }
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
 

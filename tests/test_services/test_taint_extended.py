@@ -18,7 +18,7 @@ class TestTaintAnalysisServiceExtended:
 
     @pytest.mark.asyncio
     async def test_analyze_with_rule_json_error(self, mock_query_executor):
-        """测试analyze_with_rule JSON解析失败"""
+        """测试analyze_with_rule JSON解析失败 - 返回空列表"""
         service = TaintAnalysisService(mock_query_executor)
         rule = get_rule_by_name("Command Injection")
 
@@ -28,8 +28,10 @@ class TestTaintAnalysisServiceExtended:
 
         result = await service.analyze_with_rule(rule)
 
+        # 解析失败时返回空列表
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["vulnerabilities"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_find_vulnerabilities_json_error(self, mock_query_executor):

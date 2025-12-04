@@ -17,7 +17,7 @@ class TestDataFlowServiceExtended:
 
     @pytest.mark.asyncio
     async def test_track_dataflow_json_decode_error(self, mock_query_executor):
-        """测试track_dataflow JSON解析失败"""
+        """测试track_dataflow JSON解析失败 - 返回空列表"""
         service = DataFlowService(mock_query_executor)
 
         mock_query_executor.execute = AsyncMock(
@@ -26,12 +26,14 @@ class TestDataFlowServiceExtended:
 
         result = await service.track_dataflow("source", "sink")
 
+        # 解析失败时返回空列表
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["flows"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_analyze_variable_flow_json_error(self, mock_query_executor):
-        """测试analyze_variable_flow JSON解析失败"""
+        """测试analyze_variable_flow JSON解析失败 - 返回空列表"""
         service = DataFlowService(mock_query_executor)
 
         mock_query_executor.execute = AsyncMock(
@@ -40,12 +42,14 @@ class TestDataFlowServiceExtended:
 
         result = await service.analyze_variable_flow("var")
 
+        # 解析失败时返回空列表
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["flows"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_find_data_dependencies_json_error(self, mock_query_executor):
-        """测试find_data_dependencies JSON解析失败"""
+        """测试find_data_dependencies JSON解析失败 - 返回空列表"""
         service = DataFlowService(mock_query_executor)
 
         mock_query_executor.execute = AsyncMock(
@@ -54,8 +58,10 @@ class TestDataFlowServiceExtended:
 
         result = await service.find_data_dependencies("func")
 
+        # 解析失败时返回空列表
         assert result["success"] is True
-        assert "raw_output" in result
+        assert result["dependencies"] == []
+        assert result["count"] == 0
 
     @pytest.mark.asyncio
     async def test_exception_handling(self, mock_query_executor):

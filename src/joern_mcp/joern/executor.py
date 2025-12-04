@@ -115,9 +115,15 @@ class QueryExecutor:
         if len(query) > 10000:
             return False, "Query too long (max 10000 characters)"
 
-        # 检查禁止的模式
+        # 移除引号内的内容后再检查禁止模式
+        # 这样 cpg.call.name("ProcessBuilder.start") 不会被误判
+        # 因为 "ProcessBuilder.start" 只是搜索模式，不是实际执行的代码
+        query_without_strings = re.sub(r'"[^"]*"', '""', query)
+        query_without_strings = re.sub(r"'[^']*'", "''", query_without_strings)
+
+        # 检查禁止的模式（只在非字符串部分）
         for pattern in self.forbidden_patterns:
-            if re.search(pattern, query, re.IGNORECASE):
+            if re.search(pattern, query_without_strings, re.IGNORECASE):
                 return False, f"Forbidden operation: {pattern}"
 
         return True, ""
