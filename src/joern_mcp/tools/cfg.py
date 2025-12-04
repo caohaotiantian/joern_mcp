@@ -11,17 +11,7 @@
 from loguru import logger
 
 from joern_mcp.mcp_server import mcp, server_state
-
-
-def _get_cpg_prefix(project_name: str | None) -> str:
-    """获取 CPG 访问前缀
-
-    workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
-    然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
-    """
-    if project_name:
-        return f'workspace.project("{project_name}").get.cpg.get'
-    return "cpg"
+from joern_mcp.utils.project_utils import get_safe_cpg_prefix
 
 
 @mcp.tool()
@@ -55,7 +45,10 @@ async def get_control_flow_graph(
     logger.info(f"Getting CFG for function: {function_name} (project: {project_name or 'current'})")
 
     try:
-        cpg_prefix = _get_cpg_prefix(project_name)
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
 
         # 构建查询
         if format == "dot":
@@ -123,7 +116,10 @@ async def get_dominators(
     logger.info(f"Getting dominators for function: {function_name} (project: {project_name or 'current'})")
 
     try:
-        cpg_prefix = _get_cpg_prefix(project_name)
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
 
         query = f'{cpg_prefix}.method.name("{function_name}").dotDom.l'
         result = await server_state.query_executor.execute(query, format="raw")
@@ -180,7 +176,10 @@ async def analyze_control_structures(
     logger.info(f"Analyzing control structures in: {function_name} (project: {project_name or 'current'})")
 
     try:
-        cpg_prefix = _get_cpg_prefix(project_name)
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
 
         query = f'''
         {cpg_prefix}.method.name("{function_name}")

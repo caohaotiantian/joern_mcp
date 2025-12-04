@@ -18,18 +18,8 @@ from joern_mcp.models.taint_rules import (
     get_rules_by_severity,
     list_all_rules,
 )
+from joern_mcp.utils.project_utils import get_safe_cpg_prefix
 from joern_mcp.utils.response_parser import safe_parse_joern_response
-
-
-def _get_cpg_prefix(project_name: str | None) -> str:
-    """获取 CPG 访问前缀
-
-    workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
-    然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
-    """
-    if project_name:
-        return f'workspace.project("{project_name}").get.cpg.get'
-    return "cpg"
 
 
 class TaintAnalysisService:
@@ -74,7 +64,11 @@ class TaintAnalysisService:
         logger.info(f"Running taint analysis with rule: {rule.name} (project: {project_name or 'current'})")
 
         try:
-            cpg_prefix = _get_cpg_prefix(project_name)
+            # 安全获取 CPG 前缀，验证项目存在性
+            cpg_prefix, error = await get_safe_cpg_prefix(self.executor, project_name)
+            if error:
+                return {"success": False, "error": error}
+
             source_pattern = "|".join(rule.sources)
             sink_pattern = "|".join(rule.sinks)
 
@@ -238,7 +232,10 @@ class TaintAnalysisService:
         logger.info(f"Checking taint flow: {source_pattern} -> {sink_pattern} (project: {project_name or 'current'})")
 
         try:
-            cpg_prefix = _get_cpg_prefix(project_name)
+            # 安全获取 CPG 前缀，验证项目存在性
+            cpg_prefix, error = await get_safe_cpg_prefix(self.executor, project_name)
+            if error:
+                return {"success": False, "error": error}
 
             query = f"""
             {{

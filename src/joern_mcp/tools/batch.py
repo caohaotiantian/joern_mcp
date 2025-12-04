@@ -13,17 +13,7 @@ import asyncio
 from loguru import logger
 
 from joern_mcp.mcp_server import mcp, server_state
-
-
-def _get_cpg_prefix(project_name: str | None) -> str:
-    """获取 CPG 访问前缀
-
-    workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
-    然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
-    """
-    if project_name:
-        return f'workspace.project("{project_name}").get.cpg.get'
-    return "cpg"
+from joern_mcp.utils.project_utils import get_safe_cpg_prefix
 
 
 @mcp.tool()
@@ -149,10 +139,14 @@ async def batch_function_analysis(
 
     logger.info(f"Batch analyzing {len(function_names)} functions (project: {project_name or 'current'})")
 
-    cpg_prefix = _get_cpg_prefix(project_name)
-    analyses = {}
-
     try:
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
+
+        analyses = {}
+
         for func_name in function_names:
             # 获取函数信息
             query = f'''

@@ -11,18 +11,8 @@
 from loguru import logger
 
 from joern_mcp.joern.executor import QueryExecutor
+from joern_mcp.utils.project_utils import get_safe_cpg_prefix
 from joern_mcp.utils.response_parser import safe_parse_joern_response
-
-
-def _get_cpg_prefix(project_name: str | None) -> str:
-    """获取 CPG 访问前缀
-
-    workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
-    然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
-    """
-    if project_name:
-        return f'workspace.project("{project_name}").get.cpg.get'
-    return "cpg"
 
 
 class DataFlowService:
@@ -72,7 +62,10 @@ class DataFlowService:
         logger.info(f"Tracking dataflow from {source_method} to {sink_method} (project: {project_name or 'current'})")
 
         try:
-            cpg_prefix = _get_cpg_prefix(project_name)
+            # 安全获取 CPG 前缀，验证项目存在性
+            cpg_prefix, error = await get_safe_cpg_prefix(self.executor, project_name)
+            if error:
+                return {"success": False, "error": error}
 
             query = f'''
             {{
@@ -168,7 +161,10 @@ class DataFlowService:
         logger.info(f"Analyzing variable flow: {variable_name} (project: {project_name or 'current'})")
 
         try:
-            cpg_prefix = _get_cpg_prefix(project_name)
+            # 安全获取 CPG 前缀，验证项目存在性
+            cpg_prefix, error = await get_safe_cpg_prefix(self.executor, project_name)
+            if error:
+                return {"success": False, "error": error}
 
             if sink_method:
                 query = f'''
@@ -272,7 +268,10 @@ class DataFlowService:
         logger.info(f"Finding data dependencies in function: {function_name} (project: {project_name or 'current'})")
 
         try:
-            cpg_prefix = _get_cpg_prefix(project_name)
+            # 安全获取 CPG 前缀，验证项目存在性
+            cpg_prefix, error = await get_safe_cpg_prefix(self.executor, project_name)
+            if error:
+                return {"success": False, "error": error}
 
             if variable_name:
                 query = f'''

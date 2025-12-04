@@ -14,28 +14,8 @@
 from loguru import logger
 
 from joern_mcp.mcp_server import mcp, server_state
+from joern_mcp.utils.project_utils import get_safe_cpg_prefix
 from joern_mcp.utils.response_parser import safe_parse_joern_response
-
-
-def _get_cpg_prefix(project_name: str | None) -> str:
-    """
-    获取 CPG 访问前缀
-
-    Args:
-        project_name: 项目名称（可选）
-
-    Returns:
-        str: CPG 访问语句前缀
-             - None: 使用 "cpg" (当前活动项目)
-             - 指定项目: 使用 workspace.project("name").get.cpg.get
-
-    Note:
-        workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
-        然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
-    """
-    if project_name:
-        return f'workspace.project("{project_name}").get.cpg.get'
-    return "cpg"
 
 
 @mcp.tool()
@@ -77,7 +57,10 @@ async def get_function_code(
     logger.info(f"Getting function code: {function_name} (project: {project_name or 'current'})")
 
     try:
-        cpg_prefix = _get_cpg_prefix(project_name)
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
 
         # 构建查询
         if file_filter:
@@ -166,7 +149,10 @@ async def list_functions(
     logger.info(f"Listing functions (filter: {name_filter}, limit: {limit}, project: {project_name or 'current'})")
 
     try:
-        cpg_prefix = _get_cpg_prefix(project_name)
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
 
         # 构建查询
         if name_filter:
@@ -254,7 +240,10 @@ async def search_code(
     logger.info(f"Searching code: {pattern} in {scope} (project: {project_name or 'current'})")
 
     try:
-        cpg_prefix = _get_cpg_prefix(project_name)
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        if error:
+            return {"success": False, "error": error}
 
         # 根据scope构建查询
         if scope == "methods":
