@@ -162,38 +162,82 @@ async def get_current_project() -> dict:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
-        # 获取当前项目名称
-        query = """
-        workspace.cpg.flatMap { cpg =>
-            workspace.projects.find(_.cpg.contains(cpg)).map { p =>
-                Map(
-                    "name" -> p.name,
-                    "inputPath" -> p.inputPath,
-                    "methodCount" -> cpg.method.size,
-                    "fileCount" -> cpg.file.size
-                )
-            }
-        }.headOption.getOrElse(Map("error" -> "No active project"))
-        """
+        # 使用更简单的查询获取当前项目信息
+        # 先获取当前 CPG 的 root 路径
+        root_query = "cpg.metaData.root.headOption.getOrElse(\"\")"
+        root_result = await server_state.joern_server.execute_query_async(root_query)
 
-        result = await server_state.joern_server.execute_query_async(query)
-
-        if result.get("success"):
-            stdout = result.get("stdout", "")
-            project_info = safe_parse_joern_response(stdout, default={})
-
-            if "error" in project_info:
-                return {
-                    "success": False,
-                    "error": "No active project. Use parse_project to import a project first.",
-                }
-
-            return {"success": True, "project": project_info}
-        else:
+        if not root_result.get("success"):
             return {
                 "success": False,
-                "error": result.get("stderr", "Failed to get current project"),
+                "error": "No active project. Use parse_project to import a project first.",
             }
+
+        current_root = safe_parse_joern_response(
+            root_result.get("stdout", ""), default=""
+        )
+
+        if not current_root:
+            return {
+                "success": False,
+                "error": "No active project. Use parse_project to import a project first.",
+            }
+
+        # 获取项目统计信息
+        stats_query = """
+        {
+            val methods = cpg.method.size
+            val files = cpg.file.size
+            s"${methods},${files}"
+        }
+        """
+        stats_result = await server_state.joern_server.execute_query_async(stats_query)
+
+        method_count = 0
+        file_count = 0
+
+        if stats_result.get("success"):
+            stats_str = safe_parse_joern_response(
+                stats_result.get("stdout", ""), default=""
+            )
+            if isinstance(stats_str, str) and "," in stats_str:
+                parts = stats_str.split(",")
+                try:
+                    method_count = int(parts[0])
+                    file_count = int(parts[1])
+                except (ValueError, IndexError):
+                    pass
+
+        # 查找匹配的项目名称
+        projects_query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
+        projects_result = await server_state.joern_server.execute_query_async(
+            projects_query
+        )
+
+        project_name = "unknown"
+        input_path = current_root
+
+        if projects_result.get("success"):
+            projects = safe_parse_joern_response(
+                projects_result.get("stdout", ""), default=[]
+            )
+            for p_str in projects:
+                if isinstance(p_str, str) and ":::" in p_str:
+                    parts = p_str.split(":::", 1)
+                    if len(parts) == 2 and parts[1] == current_root:
+                        project_name = parts[0]
+                        input_path = parts[1]
+                        break
+
+        return {
+            "success": True,
+            "project": {
+                "name": project_name,
+                "inputPath": input_path,
+                "methodCount": method_count,
+                "fileCount": file_count,
+            },
+        }
 
     except Exception as e:
         logger.exception(f"Error getting current project: {e}")
@@ -236,34 +280,48 @@ async def list_projects() -> dict:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
-        # 获取结构化的项目列表
-        query = """
-        {
-            val currentCpg = workspace.cpg
-            workspace.projects.map { p =>
-                Map(
-                    "name" -> p.name,
-                    "inputPath" -> p.inputPath,
-                    "isActive" -> currentCpg.exists(c => p.cpg.contains(c))
-                )
-            }.l
-        }
-        """
+        # 首先获取当前活动 CPG 的路径
+        root_query = "cpg.metaData.root.headOption.getOrElse(\"\")"
+        root_result = await server_state.joern_server.execute_query_async(root_query)
+        current_root = ""
+        if root_result.get("success"):
+            current_root = safe_parse_joern_response(
+                root_result.get("stdout", ""), default=""
+            )
+
+        # 获取项目列表（使用简单格式避免复杂 Scala 语法）
+        query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
         result = await server_state.joern_server.execute_query_async(query)
 
         if result.get("success"):
             stdout = result.get("stdout", "")
-            projects = safe_parse_joern_response(stdout, default=[])
+            raw_projects = safe_parse_joern_response(stdout, default=[])
 
-            if not isinstance(projects, list):
-                projects = [projects] if projects else []
+            if not isinstance(raw_projects, list):
+                raw_projects = [raw_projects] if raw_projects else []
 
-            # 找出当前活动项目
+            # 解析项目列表
+            projects = []
             active_project = None
-            for p in projects:
-                if p.get("isActive"):
-                    active_project = p.get("name")
-                    break
+
+            for p_str in raw_projects:
+                if isinstance(p_str, str) and ":::" in p_str:
+                    parts = p_str.split(":::", 1)
+                    if len(parts) == 2:
+                        name = parts[0]
+                        input_path = parts[1]
+                        is_active = input_path == current_root
+
+                        projects.append(
+                            {
+                                "name": name,
+                                "inputPath": input_path,
+                                "isActive": is_active,
+                            }
+                        )
+
+                        if is_active:
+                            active_project = name
 
             logger.info(f"Found {len(projects)} projects, active: {active_project}")
             return {

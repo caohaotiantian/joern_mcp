@@ -5,13 +5,67 @@ Joern Server 响应解析工具
 - 提取 JSON 数据
 - 处理双重 JSON 编码
 - 清理 ANSI 颜色码（现已在 HTTP 客户端层完成）
+- 解析 Scala 原生格式（如 List, String 等）
 """
 
+import contextlib
 import json
 import re
 from typing import Any
 
 from loguru import logger
+
+
+def _parse_scala_string(value: str) -> str:
+    """解析 Scala 字符串值
+
+    处理带引号的字符串，去除首尾引号。
+
+    Args:
+        value: Scala 字符串值（可能带引号）
+
+    Returns:
+        解析后的字符串
+    """
+    value = value.strip()
+    # 移除首尾引号
+    if (value.startswith('"') and value.endswith('"')) or (
+        value.startswith("'") and value.endswith("'")
+    ):
+        return value[1:-1]
+    return value
+
+
+def _parse_scala_list(value: str) -> list:
+    """解析 Scala List 格式
+
+    处理 Scala 的 List("item1", "item2") 格式。
+
+    Args:
+        value: Scala List 字符串
+
+    Returns:
+        解析后的 Python 列表
+    """
+    # 匹配 List(...) 格式
+    list_match = re.match(r'List\s*\((.*)\)', value, re.DOTALL)
+    if not list_match:
+        return []
+
+    content = list_match.group(1).strip()
+    if not content:
+        return []
+
+    # 解析列表元素（支持带引号的字符串）
+    items = []
+    # 使用正则匹配每个带引号的字符串
+    string_pattern = r'"([^"\\]*(?:\\.[^"\\]*)*)"'
+    for match in re.finditer(string_pattern, content):
+        # 处理转义字符
+        item = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+        items.append(item)
+
+    return items
 
 
 def parse_joern_response(stdout: str) -> Any:
@@ -20,14 +74,16 @@ def parse_joern_response(stdout: str) -> Any:
 
     Joern Server 返回的 stdout 格式示例：
     1. 直接 JSON: `[{"name": "main", ...}]`
-    2. Scala REPL: `val res1: String = "[{\"name\": \"main\", ...}]"`
-    3. 双重编码: JSON 字符串作为 JSON 字符串返回
+    2. Scala REPL JSON: `val res1: String = "[{\"name\": \"main\", ...}]"`
+    3. Scala REPL String: `val res1: String = "/path/to/project"`
+    4. Scala REPL List: `val res1: List[String] = List("item1", "item2")`
+    5. 双重编码: JSON 字符串作为 JSON 字符串返回
 
     Args:
         stdout: Joern Server 返回的 stdout 内容（已去除 ANSI 码）
 
     Returns:
-        解析后的数据（通常是 list 或 dict）
+        解析后的数据（通常是 list, dict 或 str）
 
     Raises:
         ValueError: 无法解析响应
@@ -42,24 +98,35 @@ def parse_joern_response(stdout: str) -> Any:
         data = json.loads(clean_output)
         # 处理双重编码（JSON 字符串内嵌 JSON）
         if isinstance(data, str):
-            data = json.loads(data)
+            with contextlib.suppress(json.JSONDecodeError):
+                data = json.loads(data)
         return data
     except json.JSONDecodeError:
         pass
 
-    # 尝试方法 2: 从 Scala REPL 输出提取 JSON
-    # 格式: `val res1: Type = "..."` 或 `val res1: Type = [...]`
-    match = re.search(r'=\s*(.+)$', clean_output, re.MULTILINE)
-    if match:
+    # 尝试方法 2: 从 Scala REPL 输出提取值
+    # 格式: `val res1: Type = ...`
+    repl_match = re.search(r'val\s+\w+:\s*[\w\[\]]+\s*=\s*(.+)', clean_output, re.DOTALL)
+    if repl_match:
+        value_part = repl_match.group(1).strip()
+
+        # 2a: 尝试解析为 JSON
         try:
-            json_str = match.group(1).strip()
-            data = json.loads(json_str)
-            # 处理双重编码
+            data = json.loads(value_part)
             if isinstance(data, str):
-                data = json.loads(data)
+                with contextlib.suppress(json.JSONDecodeError):
+                    data = json.loads(data)
             return data
         except json.JSONDecodeError:
             pass
+
+        # 2b: 尝试解析 Scala List 格式
+        if value_part.startswith('List('):
+            return _parse_scala_list(value_part)
+
+        # 2c: 尝试解析为 Scala 字符串
+        if value_part.startswith('"'):
+            return _parse_scala_string(value_part)
 
     # 尝试方法 3: 查找第一个 JSON 数组或对象
     json_match = re.search(r'(\[.*\]|\{.*\})', clean_output, re.DOTALL)
@@ -67,10 +134,19 @@ def parse_joern_response(stdout: str) -> Any:
         try:
             data = json.loads(json_match.group(1))
             if isinstance(data, str):
-                data = json.loads(data)
+                with contextlib.suppress(json.JSONDecodeError):
+                    data = json.loads(data)
             return data
         except json.JSONDecodeError:
             pass
+
+    # 尝试方法 4: 检查是否是简单的等号赋值格式
+    simple_match = re.search(r'=\s*(.+)$', clean_output, re.MULTILINE)
+    if simple_match:
+        value = simple_match.group(1).strip()
+        # 尝试解析为字符串
+        if value.startswith('"') and value.endswith('"'):
+            return _parse_scala_string(value)
 
     logger.warning(f"Cannot parse Joern response: {clean_output[:200]}...")
     raise ValueError(f"Cannot parse Joern response: {clean_output[:100]}...")
