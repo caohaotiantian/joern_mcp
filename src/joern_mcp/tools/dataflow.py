@@ -1,4 +1,12 @@
-"""数据流分析MCP工具"""
+"""数据流分析MCP工具
+
+提供数据流追踪和分析功能：
+- track_dataflow: 追踪数据流
+- analyze_variable_flow: 分析变量流向
+- find_data_dependencies: 查找数据依赖
+
+多项目支持：所有工具支持可选的 project_name 参数。
+"""
 
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.services.dataflow import DataFlowService
@@ -6,7 +14,10 @@ from joern_mcp.services.dataflow import DataFlowService
 
 @mcp.tool()
 async def track_dataflow(
-    source_method: str, sink_method: str, max_flows: int = 10
+    source_method: str,
+    sink_method: str,
+    max_flows: int = 10,
+    project_name: str | None = None,
 ) -> dict:
     """
     追踪从源方法到汇方法的数据流
@@ -15,14 +26,16 @@ async def track_dataflow(
         source_method: 源方法名称
         sink_method: 汇方法名称
         max_flows: 最大流数量（默认10，最大50）
+        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 数据流信息
 
     Example:
-        >>> await track_dataflow("gets", "system", max_flows=5)
+        >>> await track_dataflow("gets", "system", project_name="webapp")
         {
-            "success": True,
+            "success": true,
+            "project": "webapp",
             "source_method": "gets",
             "sink_method": "system",
             "flows": [...],
@@ -36,12 +49,15 @@ async def track_dataflow(
         return {"success": False, "error": "Max flows must be between 1 and 50"}
 
     service = DataFlowService(server_state.query_executor)
-    return await service.track_dataflow(source_method, sink_method, max_flows)
+    return await service.track_dataflow(source_method, sink_method, max_flows, project_name)
 
 
 @mcp.tool()
 async def analyze_variable_flow(
-    variable_name: str, sink_method: str | None = None, max_flows: int = 10
+    variable_name: str,
+    sink_method: str | None = None,
+    max_flows: int = 10,
+    project_name: str | None = None,
 ) -> dict:
     """
     分析变量的数据流
@@ -50,14 +66,16 @@ async def analyze_variable_flow(
         variable_name: 变量名称
         sink_method: 目标汇方法（可选）
         max_flows: 最大流数量（默认10，最大50）
+        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 变量流信息
 
     Example:
-        >>> await analyze_variable_flow("user_input", sink_method="system")
+        >>> await analyze_variable_flow("user_input", sink_method="system", project_name="webapp")
         {
-            "success": True,
+            "success": true,
+            "project": "webapp",
             "variable": "user_input",
             "flows": [...],
             "count": 2
@@ -70,12 +88,14 @@ async def analyze_variable_flow(
         return {"success": False, "error": "Max flows must be between 1 and 50"}
 
     service = DataFlowService(server_state.query_executor)
-    return await service.analyze_variable_flow(variable_name, sink_method, max_flows)
+    return await service.analyze_variable_flow(variable_name, sink_method, max_flows, project_name)
 
 
 @mcp.tool()
 async def find_data_dependencies(
-    function_name: str, variable_name: str | None = None
+    function_name: str,
+    variable_name: str | None = None,
+    project_name: str | None = None,
 ) -> dict:
     """
     查找函数中的数据依赖关系
@@ -83,14 +103,16 @@ async def find_data_dependencies(
     Args:
         function_name: 函数名称
         variable_name: 变量名称（可选，如果指定则只查找该变量）
+        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 数据依赖信息
 
     Example:
-        >>> await find_data_dependencies("main", variable_name="buf")
+        >>> await find_data_dependencies("main", variable_name="buf", project_name="webapp")
         {
-            "success": True,
+            "success": true,
+            "project": "webapp",
             "function": "main",
             "variable": "buf",
             "dependencies": [...],
@@ -101,4 +123,4 @@ async def find_data_dependencies(
         return {"success": False, "error": "Query executor not initialized"}
 
     service = DataFlowService(server_state.query_executor)
-    return await service.find_data_dependencies(function_name, variable_name)
+    return await service.find_data_dependencies(function_name, variable_name, project_name)

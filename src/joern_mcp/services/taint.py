@@ -4,6 +4,8 @@
 - analyze_with_rule: 使用特定规则进行污点分析
 - find_vulnerabilities: 查找代码中的漏洞
 - check_specific_flow: 检查自定义的污点流
+
+支持多项目查询：所有分析方法接受可选的 project_name 参数。
 """
 
 from loguru import logger
@@ -19,13 +21,25 @@ from joern_mcp.models.taint_rules import (
 from joern_mcp.utils.response_parser import safe_parse_joern_response
 
 
+def _get_cpg_prefix(project_name: str | None) -> str:
+    """获取 CPG 访问前缀"""
+    if project_name:
+        return f'workspace.project("{project_name}").cpg.get'
+    return "cpg"
+
+
 class TaintAnalysisService:
-    """污点分析服务"""
+    """污点分析服务
+
+    所有方法支持 project_name 参数指定项目范围。
+    """
 
     def __init__(self, query_executor: QueryExecutor):
         self.executor = query_executor
 
-    async def analyze_with_rule(self, rule: TaintRule, max_flows: int = 10) -> dict:
+    async def analyze_with_rule(
+        self, rule: TaintRule, max_flows: int = 10, project_name: str | None = None
+    ) -> dict:
         """
         使用特定规则进行污点分析
 
@@ -53,16 +67,17 @@ class TaintAnalysisService:
                 "count": 1
             }
         """
-        logger.info(f"Running taint analysis with rule: {rule.name}")
+        logger.info(f"Running taint analysis with rule: {rule.name} (project: {project_name or 'current'})")
 
         try:
+            cpg_prefix = _get_cpg_prefix(project_name)
             source_pattern = "|".join(rule.sources)
             sink_pattern = "|".join(rule.sinks)
 
             query = f'''
             {{
-              val sources = cpg.method.name("({source_pattern})").parameter
-              val sinks = cpg.call.name("({sink_pattern})").argument
+              val sources = {cpg_prefix}.method.name("({source_pattern})").parameter
+              val sinks = {cpg_prefix}.call.name("({sink_pattern})").argument
 
               sinks.reachableByFlows(sources).take({max_flows}).map {{ path =>
                 val sourceNode = path.elements.head
@@ -97,7 +112,7 @@ class TaintAnalysisService:
                 if not isinstance(flows, list):
                     flows = [flows] if flows else []
 
-                return {
+                response = {
                     "success": True,
                     "rule": rule.name,
                     "severity": rule.severity,
@@ -105,6 +120,9 @@ class TaintAnalysisService:
                     "vulnerabilities": flows,
                     "count": len(flows),
                 }
+                if project_name:
+                    response["project"] = project_name
+                return response
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -117,6 +135,7 @@ class TaintAnalysisService:
         rule_name: str | None = None,
         severity: str | None = None,
         max_flows: int = 10,
+        project_name: str | None = None,
     ) -> dict:
         """
         查找漏洞
@@ -140,7 +159,7 @@ class TaintAnalysisService:
             }
         """
         logger.info(
-            f"Finding vulnerabilities (rule: {rule_name}, severity: {severity})"
+            f"Finding vulnerabilities (rule: {rule_name}, severity: {severity}, project: {project_name or 'current'})"
         )
 
         try:
@@ -155,27 +174,34 @@ class TaintAnalysisService:
             summary = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
 
             for rule in rules:
-                result = await self.analyze_with_rule(rule, max_flows)
+                result = await self.analyze_with_rule(rule, max_flows, project_name)
 
                 if result.get("success") and result.get("vulnerabilities"):
                     vulns = result["vulnerabilities"]
                     all_vulnerabilities.extend(vulns)
                     summary[rule.severity] += len(vulns)
 
-            return {
+            response = {
                 "success": True,
                 "vulnerabilities": all_vulnerabilities,
                 "total_count": len(all_vulnerabilities),
                 "summary": summary,
                 "rules_checked": len(rules),
             }
+            if project_name:
+                response["project"] = project_name
+            return response
 
         except Exception as e:
             logger.exception(f"Error finding vulnerabilities: {e}")
             return {"success": False, "error": str(e)}
 
     async def check_specific_flow(
-        self, source_pattern: str, sink_pattern: str, max_flows: int = 10
+        self,
+        source_pattern: str,
+        sink_pattern: str,
+        max_flows: int = 10,
+        project_name: str | None = None,
     ) -> dict:
         """
         检查特定的污点流
@@ -205,13 +231,15 @@ class TaintAnalysisService:
                 "count": 1
             }
         """
-        logger.info(f"Checking taint flow: {source_pattern} -> {sink_pattern}")
+        logger.info(f"Checking taint flow: {source_pattern} -> {sink_pattern} (project: {project_name or 'current'})")
 
         try:
+            cpg_prefix = _get_cpg_prefix(project_name)
+
             query = f"""
             {{
-              val sources = cpg.method.name("({source_pattern})").parameter
-              val sinks = cpg.call.name("({sink_pattern})").argument
+              val sources = {cpg_prefix}.method.name("({source_pattern})").parameter
+              val sinks = {cpg_prefix}.call.name("({sink_pattern})").argument
 
               sinks.reachableByFlows(sources).take({max_flows}).map {{ path =>
                 val sourceNode = path.elements.head
@@ -247,13 +275,16 @@ class TaintAnalysisService:
                 if not isinstance(flows, list):
                     flows = [flows] if flows else []
 
-                return {
+                response = {
                     "success": True,
                     "source_pattern": source_pattern,
                     "sink_pattern": sink_pattern,
                     "flows": flows,
                     "count": len(flows),
                 }
+                if project_name:
+                    response["project"] = project_name
+                return response
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 

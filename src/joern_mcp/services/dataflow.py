@@ -4,6 +4,8 @@
 - track_dataflow: 从源到汇的数据流追踪
 - analyze_variable_flow: 分析变量的数据流
 - find_data_dependencies: 查找数据依赖关系
+
+支持多项目查询：所有方法接受可选的 project_name 参数。
 """
 
 from loguru import logger
@@ -12,14 +14,28 @@ from joern_mcp.joern.executor import QueryExecutor
 from joern_mcp.utils.response_parser import safe_parse_joern_response
 
 
+def _get_cpg_prefix(project_name: str | None) -> str:
+    """获取 CPG 访问前缀"""
+    if project_name:
+        return f'workspace.project("{project_name}").cpg.get'
+    return "cpg"
+
+
 class DataFlowService:
-    """数据流分析服务"""
+    """数据流分析服务
+
+    所有方法支持 project_name 参数指定项目范围。
+    """
 
     def __init__(self, query_executor: QueryExecutor):
         self.executor = query_executor
 
     async def track_dataflow(
-        self, source_method: str, sink_method: str, max_flows: int = 10
+        self,
+        source_method: str,
+        sink_method: str,
+        max_flows: int = 10,
+        project_name: str | None = None,
     ) -> dict:
         """
         追踪从源方法到汇方法的数据流
@@ -49,13 +65,15 @@ class DataFlowService:
                 "count": 1
             }
         """
-        logger.info(f"Tracking dataflow from {source_method} to {sink_method}")
+        logger.info(f"Tracking dataflow from {source_method} to {sink_method} (project: {project_name or 'current'})")
 
         try:
+            cpg_prefix = _get_cpg_prefix(project_name)
+
             query = f'''
             {{
-              val source = cpg.method.name("{source_method}").parameter
-              val sink = cpg.call.name("{sink_method}").argument
+              val source = {cpg_prefix}.method.name("{source_method}").parameter
+              val sink = {cpg_prefix}.call.name("{sink_method}").argument
 
               sink.reachableByFlows(source).take({max_flows}).map {{ path =>
                 val sourceNode = path.elements.head
@@ -91,13 +109,16 @@ class DataFlowService:
                 if not isinstance(flows, list):
                     flows = [flows] if flows else []
 
-                return {
+                response = {
                     "success": True,
                     "source_method": source_method,
                     "sink_method": sink_method,
                     "flows": flows,
                     "count": len(flows),
                 }
+                if project_name:
+                    response["project"] = project_name
+                return response
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -106,7 +127,11 @@ class DataFlowService:
             return {"success": False, "error": str(e)}
 
     async def analyze_variable_flow(
-        self, variable_name: str, sink_method: str | None = None, max_flows: int = 10
+        self,
+        variable_name: str,
+        sink_method: str | None = None,
+        max_flows: int = 10,
+        project_name: str | None = None,
     ) -> dict:
         """
         分析变量的数据流
@@ -136,14 +161,16 @@ class DataFlowService:
                 "count": 1
             }
         """
-        logger.info(f"Analyzing variable flow: {variable_name}")
+        logger.info(f"Analyzing variable flow: {variable_name} (project: {project_name or 'current'})")
 
         try:
+            cpg_prefix = _get_cpg_prefix(project_name)
+
             if sink_method:
                 query = f'''
                 {{
-                  val source = cpg.identifier.name("{variable_name}")
-                  val sink = cpg.call.name("{sink_method}").argument
+                  val source = {cpg_prefix}.identifier.name("{variable_name}")
+                  val sink = {cpg_prefix}.call.name("{sink_method}").argument
 
                   sink.reachableByFlows(source).take({max_flows}).map {{ path =>
                     Map(
@@ -166,7 +193,7 @@ class DataFlowService:
                 '''
             else:
                 query = f'''
-                cpg.identifier.name("{variable_name}")
+                {cpg_prefix}.identifier.name("{variable_name}")
                    .take({max_flows})
                    .map(i => Map(
                        "variable" -> "{variable_name}",
@@ -187,13 +214,16 @@ class DataFlowService:
                 if not isinstance(flows, list):
                     flows = [flows] if flows else []
 
-                return {
+                response = {
                     "success": True,
                     "variable": variable_name,
                     "sink_method": sink_method,
                     "flows": flows,
                     "count": len(flows),
                 }
+                if project_name:
+                    response["project"] = project_name
+                return response
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -202,7 +232,10 @@ class DataFlowService:
             return {"success": False, "error": str(e)}
 
     async def find_data_dependencies(
-        self, function_name: str, variable_name: str | None = None
+        self,
+        function_name: str,
+        variable_name: str | None = None,
+        project_name: str | None = None,
     ) -> dict:
         """
         查找函数中的数据依赖关系
@@ -232,12 +265,14 @@ class DataFlowService:
                 "count": 1
             }
         """
-        logger.info(f"Finding data dependencies in function: {function_name}")
+        logger.info(f"Finding data dependencies in function: {function_name} (project: {project_name or 'current'})")
 
         try:
+            cpg_prefix = _get_cpg_prefix(project_name)
+
             if variable_name:
                 query = f'''
-                cpg.method.name("{function_name}")
+                {cpg_prefix}.method.name("{function_name}")
                    .ast.isIdentifier.name("{variable_name}")
                    .map(i => Map(
                        "variable" -> i.name,
@@ -250,7 +285,7 @@ class DataFlowService:
                 '''
             else:
                 query = f'''
-                cpg.method.name("{function_name}")
+                {cpg_prefix}.method.name("{function_name}")
                    .ast.isIdentifier
                    .dedupBy(_.name)
                    .take(50)
@@ -272,13 +307,16 @@ class DataFlowService:
                 if not isinstance(dependencies, list):
                     dependencies = [dependencies] if dependencies else []
 
-                return {
+                response = {
                     "success": True,
                     "function": function_name,
                     "variable": variable_name,
                     "dependencies": dependencies,
                     "count": len(dependencies),
                 }
+                if project_name:
+                    response["project"] = project_name
+                return response
             else:
                 return {"success": False, "error": result.get("stderr", "Query failed")}
 

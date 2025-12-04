@@ -1,4 +1,13 @@
-"""结果导出MCP工具"""
+"""结果导出MCP工具
+
+提供分析结果导出功能：
+- export_cpg: 导出 CPG 到文件
+- export_analysis_results: 导出分析结果
+
+Note:
+    export_cpg 会导出当前活动项目的 CPG。
+    如需导出特定项目，请先使用 switch_project 切换到该项目。
+"""
 
 from pathlib import Path
 from typing import Any
@@ -14,7 +23,7 @@ async def export_cpg(project_name: str, output_path: str, format: str = "bin") -
     导出CPG到文件
 
     Args:
-        project_name: 项目名称
+        project_name: 项目名称（用于记录，实际导出当前活动项目的 CPG）
         output_path: 输出文件路径
         format: 导出格式 ("bin", "json", "dot")
 
@@ -24,11 +33,15 @@ async def export_cpg(project_name: str, output_path: str, format: str = "bin") -
     Example:
         >>> await export_cpg("my-project", "/tmp/cpg.bin", "bin")
         {
-            "success": True,
+            "success": true,
             "project": "my-project",
             "output_path": "/tmp/cpg.bin",
             "format": "bin"
         }
+
+    Note:
+        此函数导出当前活动项目的 CPG。
+        如需导出特定项目，请先使用 switch_project 切换到该项目。
     """
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
