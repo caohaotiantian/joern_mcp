@@ -27,10 +27,14 @@ def _get_cpg_prefix(project_name: str | None) -> str:
     Returns:
         str: CPG 访问语句前缀
              - None: 使用 "cpg" (当前活动项目)
-             - 指定项目: 使用 workspace.project("name").cpg.get
+             - 指定项目: 使用 workspace.project("name").get.cpg.get
+
+    Note:
+        workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
+        然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
     """
     if project_name:
-        return f'workspace.project("{project_name}").cpg.get'
+        return f'workspace.project("{project_name}").get.cpg.get'
     return "cpg"
 
 

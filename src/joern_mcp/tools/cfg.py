@@ -14,9 +14,13 @@ from joern_mcp.mcp_server import mcp, server_state
 
 
 def _get_cpg_prefix(project_name: str | None) -> str:
-    """获取 CPG 访问前缀"""
+    """获取 CPG 访问前缀
+
+    workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
+    然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
+    """
     if project_name:
-        return f'workspace.project("{project_name}").cpg.get'
+        return f'workspace.project("{project_name}").get.cpg.get'
     return "cpg"
 
 

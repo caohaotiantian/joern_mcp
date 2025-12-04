@@ -16,9 +16,13 @@ from joern_mcp.mcp_server import mcp, server_state
 
 
 def _get_cpg_prefix(project_name: str | None) -> str:
-    """获取 CPG 访问前缀"""
+    """获取 CPG 访问前缀
+
+    workspace.project() 返回 Option[Project]，需要先 .get 获取 Project，
+    然后 Project.cpg 返回 Option[Cpg]，再 .get 获取 Cpg。
+    """
     if project_name:
-        return f'workspace.project("{project_name}").cpg.get'
+        return f'workspace.project("{project_name}").get.cpg.get'
     return "cpg"
 
 
@@ -49,7 +53,7 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
 
     Note:
         查询使用原始 Scala 语法。如需查询特定项目，在查询中使用：
-        workspace.project("name").cpg.get.method.name.l
+        workspace.project("name").get.cpg.get.method.name.l
     """
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}

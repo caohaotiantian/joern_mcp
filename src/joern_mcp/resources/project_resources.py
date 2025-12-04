@@ -48,14 +48,20 @@ async def project_info_resource(project_name: str) -> str:
         if not server_state.query_executor:
             return '{"success": false, "error": "Query executor not initialized"}'
 
+        # workspace.project() 返回 Option[Project]，需要用 flatMap 处理
+        # 使用项目自己的 CPG 而不是全局的 cpg
         query = f'''
-        workspace.project("{project_name}").map(p => Map(
-            "name" -> p.name,
-            "inputPath" -> p.inputPath,
-            "methods" -> cpg.method.name.dedup.size,
-            "files" -> cpg.file.name.dedup.size,
-            "lines" -> cpg.method.lineNumber.max.getOrElse(0)
-        ))
+        workspace.project("{project_name}").flatMap {{ p =>
+            p.cpg.map {{ c =>
+                Map(
+                    "name" -> p.name,
+                    "inputPath" -> p.inputPath,
+                    "methods" -> c.method.name.dedup.size,
+                    "files" -> c.file.name.dedup.size,
+                    "lines" -> c.method.lineNumber.max.getOrElse(0)
+                )
+            }}
+        }}
         '''
 
         result = await server_state.query_executor.execute(query)
