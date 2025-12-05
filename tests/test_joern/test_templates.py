@@ -56,8 +56,17 @@ def test_list_templates():
     assert "TAINT_ANALYSIS" in templates
 
 
-def test_search_pattern():
-    """测试搜索模式查询"""
-    query = QueryTemplates.build("SEARCH_BY_PATTERN", pattern="strcpy", limit=50)
+def test_search_calls_pattern():
+    """测试搜索调用模式查询"""
+    query = QueryTemplates.build("SEARCH_CALLS_BY_PATTERN", pattern="strcpy", limit=50)
     assert "strcpy" in query
     assert "take(50)" in query
+    assert "CALL" in query
+
+
+def test_search_identifiers_pattern():
+    """测试搜索标识符模式查询"""
+    query = QueryTemplates.build("SEARCH_IDENTIFIERS_BY_PATTERN", pattern="user", limit=25)
+    assert "user" in query
+    assert "take(25)" in query
+    assert "IDENTIFIER" in query

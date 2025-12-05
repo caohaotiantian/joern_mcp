@@ -2,9 +2,24 @@
 共享测试fixtures和utilities
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+
+# 全局 mock for get_safe_cpg_prefix
+async def mock_get_safe_cpg_prefix(executor, project_name):
+    """返回简单的 cpg 前缀，跳过项目验证"""
+    return "cpg", None
+
+
+@pytest.fixture(autouse=True)
+def mock_project_validation():
+    """自动 mock 所有服务的 get_safe_cpg_prefix"""
+    with patch("joern_mcp.services.callgraph.get_safe_cpg_prefix", mock_get_safe_cpg_prefix), \
+         patch("joern_mcp.services.dataflow.get_safe_cpg_prefix", mock_get_safe_cpg_prefix), \
+         patch("joern_mcp.services.taint.get_safe_cpg_prefix", mock_get_safe_cpg_prefix):
+        yield
 
 
 @pytest.fixture

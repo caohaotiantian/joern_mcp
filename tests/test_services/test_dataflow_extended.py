@@ -24,7 +24,7 @@ class TestDataFlowServiceExtended:
             return_value={"success": True, "stdout": "invalid json"}
         )
 
-        result = await service.track_dataflow("source", "sink")
+        result = await service.track_dataflow("source", "sink", project_name="test")
 
         # 解析失败时返回空列表
         assert result["success"] is True
@@ -40,7 +40,7 @@ class TestDataFlowServiceExtended:
             return_value={"success": True, "stdout": "bad json"}
         )
 
-        result = await service.analyze_variable_flow("var")
+        result = await service.analyze_variable_flow("var", project_name="test")
 
         # 解析失败时返回空列表
         assert result["success"] is True
@@ -56,7 +56,7 @@ class TestDataFlowServiceExtended:
             return_value={"success": True, "stdout": "not json"}
         )
 
-        result = await service.find_data_dependencies("func")
+        result = await service.find_data_dependencies("func", project_name="test")
 
         # 解析失败时返回空列表
         assert result["success"] is True
@@ -70,7 +70,7 @@ class TestDataFlowServiceExtended:
 
         mock_query_executor.execute = AsyncMock(side_effect=Exception("Test error"))
 
-        result = await service.track_dataflow("src", "sink")
+        result = await service.track_dataflow("src", "sink", project_name="test")
         assert result["success"] is False
         assert "error" in result
 
@@ -83,7 +83,7 @@ class TestDataFlowServiceExtended:
             return_value={"success": False, "stderr": "Error"}
         )
 
-        result = await service.track_dataflow("src", "sink")
+        result = await service.track_dataflow("src", "sink", project_name="test")
         assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -98,8 +98,8 @@ class TestDataFlowServiceExtended:
         )
 
         # 测试不同的max_flows值
-        result1 = await service.track_dataflow("src", "sink", max_flows=5)
+        result1 = await service.track_dataflow("src", "sink", max_flows=5, project_name="test")
         assert result1["success"] is True
 
-        result2 = await service.track_dataflow("src", "sink", max_flows=20)
+        result2 = await service.track_dataflow("src", "sink", max_flows=20, project_name="test")
         assert result2["success"] is True

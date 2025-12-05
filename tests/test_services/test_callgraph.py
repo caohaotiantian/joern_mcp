@@ -14,12 +14,12 @@ async def test_get_callers():
     mock_executor.execute = AsyncMock(
         return_value={
             "success": True,
-            "stdout": '[{"name": "main", "filename": "main.c", "lineNumber": 10}]',
+            "stdout": '[{"name": "main", "filename": "main.c", "lineNumber": 10, "signature": "int()"}]',
         }
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_callers("vulnerable_func", depth=1)
+    result = await service.get_callers("vulnerable_func", depth=1, project_name="test")
 
     # 验证返回结果
     assert result["success"] is True
@@ -45,12 +45,12 @@ async def test_get_callees():
     mock_executor.execute = AsyncMock(
         return_value={
             "success": True,
-            "stdout": '[{"name": "strcpy", "filename": "string.h", "lineNumber": 20}]',
+            "stdout": '[{"name": "strcpy", "filename": "string.h", "lineNumber": 20, "signature": "char*()"}]',
         }
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_callees("main", depth=1)
+    result = await service.get_callees("main", depth=1, project_name="test")
 
     # 验证返回结果
     assert result["success"] is True
@@ -81,7 +81,7 @@ async def test_get_call_chain():
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_call_chain("target_func", max_depth=5, direction="up")
+    result = await service.get_call_chain("target_func", max_depth=5, direction="up", project_name="test")
 
     assert result["success"] is True
     assert result["function"] == "target_func"
@@ -104,19 +104,19 @@ async def test_get_call_graph():
             # callers
             return {
                 "success": True,
-                "stdout": '[{"name": "caller1", "filename": "main.c", "lineNumber": 10}]',
+                "stdout": '[{"name": "caller1", "filename": "main.c", "lineNumber": 10, "signature": "int()"}]',
             }
         else:
             # callees
             return {
                 "success": True,
-                "stdout": '[{"name": "callee1", "filename": "utils.c", "lineNumber": 20}]',
+                "stdout": '[{"name": "callee1", "filename": "utils.c", "lineNumber": 20, "signature": "void()"}]',
             }
 
     mock_executor.execute = mock_execute
 
     service = CallGraphService(mock_executor)
-    result = await service.get_call_graph("main", depth=2)
+    result = await service.get_call_graph("main", depth=2, project_name="test")
 
     assert result["success"] is True
     assert result["function"] == "main"
@@ -134,7 +134,7 @@ async def test_get_callers_query_failed():
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_callers("nonexistent")
+    result = await service.get_callers("nonexistent", project_name="test")
 
     assert result["success"] is False
     assert "error" in result
@@ -147,12 +147,12 @@ async def test_get_callers_with_depth():
     mock_executor.execute = AsyncMock(
         return_value={
             "success": True,
-            "stdout": '[{"name": "func1"}, {"name": "func2"}]',
+            "stdout": '[{"name": "func1", "signature": "int()", "filename": "a.c", "lineNumber": 1}, {"name": "func2", "signature": "void()", "filename": "b.c", "lineNumber": 2}]',
         }
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_callers("target", depth=3)
+    result = await service.get_callers("target", depth=3, project_name="test")
 
     assert result["success"] is True
     assert result["depth"] == 3

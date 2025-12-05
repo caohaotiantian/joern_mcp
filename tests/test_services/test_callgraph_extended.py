@@ -25,7 +25,7 @@ class TestCallGraphServiceExtended:
             return_value={"success": True, "stdout": "invalid json {{"}
         )
 
-        result = await service.get_callers("test_func")
+        result = await service.get_callers("test_func", project_name="test")
 
         # 解析失败时返回空列表（使用safe_parse_joern_response的默认值）
         assert result["success"] is True
@@ -41,7 +41,7 @@ class TestCallGraphServiceExtended:
             return_value={"success": True, "stdout": "not valid json"}
         )
 
-        result = await service.get_callees("test_func")
+        result = await service.get_callees("test_func", project_name="test")
 
         # 解析失败时返回空列表
         assert result["success"] is True
@@ -57,7 +57,7 @@ class TestCallGraphServiceExtended:
             return_value={"success": True, "stdout": "bad json"}
         )
 
-        result = await service.get_call_chain("func_a")
+        result = await service.get_call_chain("func_a", project_name="test")
 
         # 解析失败时返回空列表
         assert result["success"] is True
@@ -69,20 +69,15 @@ class TestCallGraphServiceExtended:
         """测试获取调用图"""
         service = CallGraphService(mock_query_executor)
 
-        # Mock调用图数据
-        graph_data = {
-            "nodes": [
-                {"name": "main", "type": "function"},
-                {"name": "helper", "type": "function"},
-            ],
-            "edges": [{"from": "main", "to": "helper"}],
-        }
-
+        # Mock返回有效数据
         mock_query_executor.execute = AsyncMock(
-            return_value={"success": True, "stdout": json.dumps(graph_data)}
+            return_value={
+                "success": True,
+                "stdout": '[{"name": "caller", "filename": "main.c", "lineNumber": 10, "signature": "int()"}]'
+            }
         )
 
-        result = await service.get_call_graph("main", depth=2)
+        result = await service.get_call_graph("main", depth=2, project_name="test")
 
         assert result["success"] is True
 
@@ -94,23 +89,23 @@ class TestCallGraphServiceExtended:
         mock_query_executor.execute = AsyncMock(
             return_value={
                 "success": True,
-                "stdout": json.dumps({"nodes": [], "edges": []}),
+                "stdout": "[]",
             }
         )
 
         # 测试不同选项组合
         result1 = await service.get_call_graph(
-            "test", include_callers=True, include_callees=False
+            "test", include_callers=True, include_callees=False, project_name="test"
         )
         assert result1["success"] is True
 
         result2 = await service.get_call_graph(
-            "test", include_callers=False, include_callees=True
+            "test", include_callers=False, include_callees=True, project_name="test"
         )
         assert result2["success"] is True
 
         result3 = await service.get_call_graph(
-            "test", include_callers=False, include_callees=False
+            "test", include_callers=False, include_callees=False, project_name="test"
         )
         assert result3["success"] is True
 
@@ -122,7 +117,7 @@ class TestCallGraphServiceExtended:
         # Mock抛出异常
         mock_query_executor.execute = AsyncMock(side_effect=Exception("Test exception"))
 
-        result = await service.get_callers("test")
+        result = await service.get_callers("test", project_name="test")
         assert result["success"] is False
         assert "error" in result
 
@@ -135,7 +130,7 @@ class TestCallGraphServiceExtended:
             return_value={"success": False, "stderr": "Query failed"}
         )
 
-        result = await service.get_callers("test")
+        result = await service.get_callers("test", project_name="test")
         assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -143,13 +138,16 @@ class TestCallGraphServiceExtended:
         """测试多层深度的callees"""
         service = CallGraphService(mock_query_executor)
 
-        callees_data = [{"name": f"func_{i}", "filename": "test.c"} for i in range(10)]
+        callees_data = [
+            {"name": f"func_{i}", "filename": "test.c", "lineNumber": i, "signature": "void()"}
+            for i in range(10)
+        ]
 
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": json.dumps(callees_data)}
         )
 
-        result = await service.get_callees("main", depth=5)
+        result = await service.get_callees("main", depth=5, project_name="test")
 
         assert result["success"] is True
         assert len(result["callees"]) == 10

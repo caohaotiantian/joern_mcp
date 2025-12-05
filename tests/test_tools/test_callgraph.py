@@ -22,14 +22,14 @@ class TestCallGraphTools:
 
         # Mock查询结果 - 返回JSON格式的stdout
         callers_data = [
-            {"name": "caller1", "filename": "test.c"},
-            {"name": "caller2", "filename": "test.c"},
+            {"name": "caller1", "filename": "test.c", "signature": "void()", "lineNumber": 10},
+            {"name": "caller2", "filename": "test.c", "signature": "int()", "lineNumber": 20},
         ]
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": json.dumps(callers_data)}
         )
 
-        result = await service.get_callers("main", depth=1)
+        result = await service.get_callers("main", depth=1, project_name="test")
 
         assert result["success"] is True
         assert result["function"] == "main"
@@ -42,14 +42,14 @@ class TestCallGraphTools:
 
         # Mock查询结果 - 返回JSON格式的stdout
         callees_data = [
-            {"name": "helper", "filename": "test.c"},
-            {"name": "printf", "filename": "libc.so"},
+            {"name": "helper", "filename": "test.c", "signature": "void()", "lineNumber": 30},
+            {"name": "printf", "filename": "libc.so", "signature": "int()", "lineNumber": -1},
         ]
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": json.dumps(callees_data)}
         )
 
-        result = await service.get_callees("main", depth=1)
+        result = await service.get_callees("main", depth=1, project_name="test")
 
         assert result["success"] is True
         assert result["function"] == "main"
@@ -70,9 +70,9 @@ class TestCallGraphTools:
             return_value={"success": True, "stdout": json.dumps(chain_data)}
         )
 
-        # get_call_chain(function_name, max_depth, direction)
+        # get_call_chain(function_name, max_depth, direction, project_name)
         result = await service.get_call_chain(
-            function_name="main", max_depth=5, direction="down"
+            function_name="main", max_depth=5, direction="down", project_name="test"
         )
 
         assert result["success"] is True
@@ -90,7 +90,7 @@ class TestCallGraphEdgeCases:
             return_value={"success": True, "stdout": "[]"}
         )
 
-        result = await service.get_callers("isolated_function")
+        result = await service.get_callers("isolated_function", project_name="test")
 
         assert result["success"] is True
         assert len(result["callers"]) == 0
@@ -104,7 +104,7 @@ class TestCallGraphEdgeCases:
             return_value={"success": True, "stdout": "[]"}
         )
 
-        result = await service.get_callees("main", depth=0)
+        result = await service.get_callees("main", depth=0, project_name="test")
 
         assert result["success"] is True
 
@@ -117,7 +117,8 @@ class TestCallGraphEdgeCases:
             return_value={"success": True, "stdout": "[]"}
         )
 
-        result = await service.get_call_chain("func_a", "func_z")
+        # 正确的调用方式：function_name, max_depth, direction
+        result = await service.get_call_chain("func_a", max_depth=5, direction="up", project_name="test")
 
         assert result["success"] is True
 
@@ -127,13 +128,16 @@ class TestCallGraphEdgeCases:
         service = CallGraphService(mock_query_executor)
 
         # 大深度可能返回很多结果
-        callers = [{"name": f"caller{i}", "filename": "test.c"} for i in range(100)]
+        callers = [
+            {"name": f"caller{i}", "filename": "test.c", "signature": "void()", "lineNumber": i}
+            for i in range(100)
+        ]
 
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": json.dumps(callers)}
         )
 
-        result = await service.get_callers("main", depth=10)
+        result = await service.get_callers("main", depth=10, project_name="test")
 
         assert result["success"] is True
         assert len(result["callers"]) == 100
@@ -147,11 +151,12 @@ class TestCallGraphEdgeCases:
         mock_query_executor.execute = AsyncMock(
             return_value={
                 "success": True,
-                "stdout": json.dumps([{"path": ["func_a", "func_b", "func_a"]}]),
+                "stdout": json.dumps([{"name": "func_a", "filename": "test.c"}, {"name": "func_b", "filename": "test.c"}]),
             }
         )
 
-        result = await service.get_call_chain("func_a", "func_a")
+        # 正确的调用方式
+        result = await service.get_call_chain("func_a", max_depth=5, direction="up", project_name="test")
 
         assert result["success"] is True
 
@@ -165,7 +170,7 @@ class TestCallGraphEdgeCases:
             return_value={"success": False, "stderr": "Function not found"}
         )
 
-        result = await service.get_callers("nonexistent_function")
+        result = await service.get_callers("nonexistent_function", project_name="test")
 
         assert result["success"] is False
         assert "error" in result

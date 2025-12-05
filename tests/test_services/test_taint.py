@@ -57,7 +57,7 @@ async def test_analyze_with_rule():
 
     service = TaintAnalysisService(mock_executor)
     rule = get_rule_by_name("Command Injection")
-    result = await service.analyze_with_rule(rule)
+    result = await service.analyze_with_rule(rule, project_name="test")
 
     assert result["success"] is True
     assert result["rule"] == "Command Injection"
@@ -83,7 +83,7 @@ async def test_find_vulnerabilities():
     )
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.find_vulnerabilities(severity="CRITICAL")
+    result = await service.find_vulnerabilities(severity="CRITICAL", project_name="test")
 
     assert result["success"] is True
     assert "vulnerabilities" in result
@@ -98,7 +98,7 @@ async def test_find_vulnerabilities_by_rule_name():
     mock_executor.execute = AsyncMock(return_value={"success": True, "stdout": "[]"})
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.find_vulnerabilities(rule_name="Command Injection")
+    result = await service.find_vulnerabilities(rule_name="Command Injection", project_name="test")
 
     assert result["success"] is True
     assert result["rules_checked"] == 1
@@ -121,7 +121,7 @@ async def test_check_specific_flow():
     )
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.check_specific_flow("gets", "system")
+    result = await service.check_specific_flow("gets", "system", project_name="test")
 
     assert result["success"] is True
     assert result["source_pattern"] == "gets"
@@ -136,7 +136,7 @@ async def test_check_specific_flow_no_results():
     mock_executor.execute = AsyncMock(return_value={"success": True, "stdout": "[]"})
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.check_specific_flow("safe_func", "safe_sink")
+    result = await service.check_specific_flow("safe_func", "safe_sink", project_name="test")
 
     assert result["success"] is True
     assert result["count"] == 0
@@ -189,7 +189,7 @@ async def test_analyze_query_failed():
 
     service = TaintAnalysisService(mock_executor)
     rule = get_rule_by_name("Command Injection")
-    result = await service.analyze_with_rule(rule)
+    result = await service.analyze_with_rule(rule, project_name="test")
 
     assert result["success"] is False
     assert "error" in result

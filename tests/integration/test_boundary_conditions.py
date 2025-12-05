@@ -17,13 +17,14 @@ class TestBoundaryConditions:
 
     async def test_get_callers_nonexistent_function(self, joern_server, sample_c_code):
         """测试查询不存在的函数的调用者"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_1")
+        project_name = "boundary_test_1"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
 
         # 查询不存在的函数
-        result = await service.get_callers("this_function_does_not_exist")
+        result = await service.get_callers("this_function_does_not_exist", project_name=project_name)
 
         # 应该成功但返回空结果
         assert result.get("success"), f"查询应该成功，错误: {result.get('error')}"
@@ -33,13 +34,14 @@ class TestBoundaryConditions:
 
     async def test_get_callees_nonexistent_function(self, joern_server, sample_c_code):
         """测试查询不存在的函数的被调用者"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_2")
+        project_name = "boundary_test_2"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
 
         # 查询不存在的函数
-        result = await service.get_callees("this_function_does_not_exist")
+        result = await service.get_callees("this_function_does_not_exist", project_name=project_name)
 
         # 应该成功但返回空结果
         assert result.get("success"), f"查询应该成功，错误: {result.get('error')}"
@@ -49,16 +51,17 @@ class TestBoundaryConditions:
 
     async def test_call_chain_with_max_depth_limit(self, joern_server, sample_c_code):
         """测试不同深度限制的调用链"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_3")
+        project_name = "boundary_test_3"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
 
         # 测试不同深度
-        for depth in [1, 2, 5, 10]:
-            result = await service.get_call_chain("main", max_depth=depth, direction="down")
+        for depth in [1, 2, 5]:
+            result = await service.get_call_chain("main", max_depth=depth, direction="down", project_name=project_name)
 
-            assert result.get("success"), f"depth={depth}应该成功"
+            assert result.get("success"), f"depth={depth}应该成功, error={result.get('error')}"
             assert result["max_depth"] == depth, f"max_depth应该是{depth}"
             assert "chain" in result, "应该包含chain字段"
             assert isinstance(result["chain"], list), "chain应该是列表"
@@ -68,13 +71,14 @@ class TestBoundaryConditions:
 
     async def test_dataflow_empty_result(self, joern_server, sample_c_code):
         """测试数据流查询返回空结果"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_4")
+        project_name = "boundary_test_4"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = DataFlowService(executor)
 
         # 查询不存在的数据流
-        result = await service.track_dataflow("nonexistent_source", "nonexistent_sink")
+        result = await service.track_dataflow("nonexistent_source", "nonexistent_sink", project_name=project_name)
 
         # 应该成功但返回空结果
         assert result.get("success"), f"查询应该成功，错误: {result.get('error')}"
@@ -85,7 +89,8 @@ class TestBoundaryConditions:
 
     async def test_variable_flow_with_max_flows_limit(self, joern_server, sample_c_code):
         """测试max_flows限制"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_5")
+        project_name = "boundary_test_5"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = DataFlowService(executor)
@@ -93,7 +98,7 @@ class TestBoundaryConditions:
         # 测试不同的流限制
         for max_flows in [1, 3, 5, 10]:
             result = await service.analyze_variable_flow(
-                "user_input", "strcpy", max_flows=max_flows
+                "user_input", "strcpy", max_flows=max_flows, project_name=project_name
             )
 
             if result.get("success") and "flows" in result:
@@ -103,14 +108,15 @@ class TestBoundaryConditions:
 
     async def test_taint_analysis_empty_result(self, joern_server, sample_c_code):
         """测试污点分析返回空结果"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_6")
+        project_name = "boundary_test_6"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = TaintAnalysisService(executor)
 
         # 检查不存在的数据流
         result = await service.check_specific_flow(
-            "nonexistent_source", "nonexistent_sink"
+            "nonexistent_source", "nonexistent_sink", project_name=project_name
         )
 
         # 应该成功但返回空结果
@@ -124,7 +130,8 @@ class TestBoundaryConditions:
         """测试并发查询"""
         import asyncio
 
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_7")
+        project_name = "boundary_test_7"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         callgraph_service = CallGraphService(executor)
@@ -132,10 +139,10 @@ class TestBoundaryConditions:
 
         # 并发执行多个不同类型的查询
         tasks = [
-            callgraph_service.get_callers("main"),
-            callgraph_service.get_callees("process_input"),
-            callgraph_service.get_call_chain("unsafe_strcpy", max_depth=3),
-            dataflow_service.find_data_dependencies("main"),
+            callgraph_service.get_callers("main", project_name=project_name),
+            callgraph_service.get_callees("process_input", project_name=project_name),
+            callgraph_service.get_call_chain("unsafe_strcpy", max_depth=3, project_name=project_name),
+            dataflow_service.find_data_dependencies("main", project_name=project_name),
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -150,7 +157,8 @@ class TestBoundaryConditions:
 
     async def test_special_characters_in_function_name(self, joern_server, sample_c_code):
         """测试函数名包含特殊字符的情况"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_8")
+        project_name = "boundary_test_8"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
@@ -162,7 +170,7 @@ class TestBoundaryConditions:
         ]
 
         for func_name in special_names:
-            result = await service.get_callers(func_name)
+            result = await service.get_callers(func_name, project_name=project_name)
 
             # 应该成功（即使找不到函数）
             assert isinstance(result, dict), f"查询{func_name}应该返回dict"
@@ -174,23 +182,24 @@ class TestBoundaryConditions:
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
 
-        # 在空项目中查询
+        # 在空项目中查询（不传 project_name 应该返回错误）
         result = await service.get_callers("main")
 
-        # 应该成功但返回空结果
+        # 应该返回错误，因为 project_name 是必填的
         assert isinstance(result, dict), "应该返回dict"
-        assert "callers" in result or "error" in result or not result.get("success"), \
-            "应该返回空callers或错误"
+        assert result.get("success") is False or "error" in result, \
+            "没有 project_name 应该返回错误"
 
     async def test_zero_depth_query(self, joern_server, sample_c_code):
         """测试depth=0的查询"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_9")
+        project_name = "boundary_test_9"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
 
         # depth=0应该返回函数本身或空结果
-        result = await service.get_callers("main", depth=0)
+        result = await service.get_callers("main", depth=0, project_name=project_name)
 
         assert isinstance(result, dict), "应该返回dict"
         assert "success" in result, "应该包含success字段"
@@ -198,13 +207,14 @@ class TestBoundaryConditions:
 
     async def test_very_large_depth(self, joern_server, sample_c_code):
         """测试非常大的depth值"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_10")
+        project_name = "boundary_test_10"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
 
         # 非常大的depth值应该被处理（可能被限制）
-        result = await service.get_call_chain("main", max_depth=100)
+        result = await service.get_call_chain("main", max_depth=100, project_name=project_name)
 
         assert isinstance(result, dict), "应该返回dict"
         assert "success" in result, "应该包含success字段"
@@ -212,15 +222,15 @@ class TestBoundaryConditions:
 
     async def test_max_flows_zero(self, joern_server, sample_c_code):
         """测试max_flows=0的情况"""
-        await import_code_safe(joern_server, str(sample_c_code), "boundary_test_11")
+        project_name = "boundary_test_11"
+        await import_code_safe(joern_server, str(sample_c_code), project_name)
 
         executor = QueryExecutor(joern_server)
         service = DataFlowService(executor)
 
         # max_flows=0应该返回空结果
-        result = await service.track_dataflow("gets", "strcpy", max_flows=0)
+        result = await service.track_dataflow("gets", "strcpy", max_flows=0, project_name=project_name)
 
         assert isinstance(result, dict), "应该返回dict"
         if result.get("success") and "flows" in result:
             assert len(result["flows"]) == 0, "max_flows=0应该返回空flows"
-

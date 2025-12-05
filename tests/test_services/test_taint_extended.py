@@ -26,7 +26,7 @@ class TestTaintAnalysisServiceExtended:
             return_value={"success": True, "stdout": "invalid json"}
         )
 
-        result = await service.analyze_with_rule(rule)
+        result = await service.analyze_with_rule(rule, project_name="test")
 
         # 解析失败时返回空列表
         assert result["success"] is True
@@ -42,7 +42,7 @@ class TestTaintAnalysisServiceExtended:
             return_value={"success": True, "stdout": "bad json"}
         )
 
-        result = await service.find_vulnerabilities()
+        result = await service.find_vulnerabilities(project_name="test")
 
         assert result["success"] is True
 
@@ -55,7 +55,7 @@ class TestTaintAnalysisServiceExtended:
             return_value={"success": True, "stdout": "not json"}
         )
 
-        result = await service.check_specific_flow("src", "sink")
+        result = await service.check_specific_flow("src", "sink", project_name="test")
 
         assert result["success"] is True
 
@@ -67,7 +67,7 @@ class TestTaintAnalysisServiceExtended:
 
         mock_query_executor.execute = AsyncMock(side_effect=Exception("Test error"))
 
-        result = await service.analyze_with_rule(rule)
+        result = await service.analyze_with_rule(rule, project_name="test")
         assert result["success"] is False
         assert "error" in result
 
@@ -81,7 +81,7 @@ class TestTaintAnalysisServiceExtended:
             return_value={"success": False, "stderr": "Error"}
         )
 
-        result = await service.analyze_with_rule(rule)
+        result = await service.analyze_with_rule(rule, project_name="test")
         assert result["success"] is False
 
     @pytest.mark.asyncio
@@ -96,7 +96,7 @@ class TestTaintAnalysisServiceExtended:
             return_value={"success": True, "stdout": json.dumps(vuln_data)}
         )
 
-        result = await service.analyze_with_rule(rule, max_flows=15)
+        result = await service.analyze_with_rule(rule, max_flows=15, project_name="test")
         assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -112,5 +112,5 @@ class TestTaintAnalysisServiceExtended:
 
         # 测试每个规则都可以使用
         for rule in VULNERABILITY_RULES:
-            result = await service.analyze_with_rule(rule, max_flows=5)
+            result = await service.analyze_with_rule(rule, max_flows=5, project_name="test")
             assert result["success"] is True

@@ -39,16 +39,18 @@ class TestJoernServerManagerMock:
 
     @pytest.mark.asyncio
     async def test_start_with_port_occupied(self):
-        """测试端口被占用时启动失败"""
+        """测试端口被占用且禁用自动选择端口时启动失败"""
         with (
             patch("shutil.which", return_value="/usr/local/bin/joern"),
             patch.object(Path, "exists", return_value=True),
             patch("joern_mcp.joern.server.is_port_available", return_value=False),
+            patch("joern_mcp.joern.server.get_port_info", return_value=None),
         ):
             manager = JoernServerManager(port=8080)
 
-            with pytest.raises(JoernServerError, match="Port.*already in use"):
-                await manager.start()
+            # 设置 auto_select_port=False 来测试端口占用时抛出异常
+            with pytest.raises(JoernServerError, match="already in use"):
+                await manager.start(auto_select_port=False)
 
     @pytest.mark.asyncio
     async def test_start_command_building(self):
