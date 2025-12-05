@@ -68,7 +68,7 @@ def _parse_scala_list(value: str) -> list:
     return items
 
 
-def _recursively_parse_json(data: Any, max_depth: int = 5) -> Any:
+def _recursively_parse_json(data: Any, max_depth: int = 10) -> Any:
     """递归解析可能多重编码的 JSON 数据
 
     Args:
@@ -84,10 +84,24 @@ def _recursively_parse_json(data: Any, max_depth: int = 5) -> Any:
     # 如果是字符串，尝试解析为 JSON
     if isinstance(data, str):
         data_stripped = data.strip()
+
         # 移除多余的首尾双引号（如 '""[...]""'）
         while (data_stripped.startswith('""') and data_stripped.endswith('""')
                and len(data_stripped) > 4):
             data_stripped = data_stripped[2:-2]
+
+        # 处理转义的 JSON 字符串（如 \n, \", \\）
+        if '\\n' in data_stripped or '\\"' in data_stripped:
+            # 尝试解码转义字符
+            try:
+                # 先尝试作为 JSON 字符串解码
+                if data_stripped.startswith('"') and data_stripped.endswith('"'):
+                    decoded = json.loads(data_stripped)
+                    if isinstance(decoded, str):
+                        data_stripped = decoded
+            except json.JSONDecodeError:
+                pass
+
         # 单层引号包裹
         while (data_stripped.startswith('"') and data_stripped.endswith('"')
                and len(data_stripped) > 2):
@@ -97,11 +111,21 @@ def _recursively_parse_json(data: Any, max_depth: int = 5) -> Any:
                 data_stripped = inner
                 break
             else:
+                # 检查是否是转义的 JSON
+                try:
+                    test_parse = json.loads(data_stripped)
+                    if isinstance(test_parse, str) and (test_parse.startswith('[') or test_parse.startswith('{')):
+                        data_stripped = test_parse
+                        continue
+                except json.JSONDecodeError:
+                    pass
                 break
 
+        # 尝试解析为 JSON
         with contextlib.suppress(json.JSONDecodeError):
             parsed = json.loads(data_stripped)
             return _recursively_parse_json(parsed, max_depth - 1)
+
         return data_stripped
 
     # 如果是列表，递归解析每个元素

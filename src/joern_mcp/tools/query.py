@@ -99,11 +99,30 @@ async def get_function_code(
             if not isinstance(functions, list):
                 functions = [functions] if functions else []
 
+            # 确保每个函数都是字典格式（处理多重编码问题）
+            parsed_functions = []
+            for func in functions:
+                if isinstance(func, dict):
+                    parsed_functions.append(func)
+                elif isinstance(func, str):
+                    # 尝试解析字符串为 JSON
+                    import json
+                    try:
+                        parsed = json.loads(func)
+                        if isinstance(parsed, dict):
+                            parsed_functions.append(parsed)
+                        elif isinstance(parsed, list):
+                            parsed_functions.extend(parsed)
+                        else:
+                            parsed_functions.append({"code": str(parsed)})
+                    except json.JSONDecodeError:
+                        parsed_functions.append({"code": func})
+
             return {
                 "success": True,
                 "project": project_name,
-                "functions": functions,
-                "count": len(functions),
+                "functions": parsed_functions,
+                "count": len(parsed_functions),
             }
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
