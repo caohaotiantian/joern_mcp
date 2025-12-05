@@ -222,7 +222,26 @@ async def joern_server(event_loop):
                 logger.warning(f"⚠️  Port {server.port} still in use after stop")
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(autouse=True)
+def cleanup_projects_after_test(joern_server, event_loop):
+    """每个测试后清理所有项目，防止项目累积导致性能下降"""
+    yield
+
+    # 测试结束后清理所有项目
+    async def cleanup():
+        if not joern_server:
+            return
+        try:
+            # 删除所有项目
+            await joern_server.execute_query_async('workspace.projects.foreach(p => delete(p.name))')
+        except Exception:
+            # 忽略清理错误
+            pass
+
+    event_loop.run_until_complete(cleanup())
+
+
+@pytest.fixture(scope="function", autouse=False)
 async def ensure_joern_server_health(joern_server):
     """在每个测试前确保Joern server健康
 

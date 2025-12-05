@@ -1,6 +1,6 @@
 # 安全分析脚本
 
-本目录包含用于检测各类漏洞的独立分析脚本。
+本目录包含用于检测各类漏洞和测试分析功能的独立脚本。
 
 ## 脚本列表
 
@@ -9,6 +9,7 @@
 | `analyze_command_injection.py` | 命令注入检测 | CWE-78 |
 | `analyze_buffer_overflow.py` | 缓冲区溢出检测 | CWE-120 |
 | `analyze_all_vulnerabilities.py` | 综合安全扫描 | 多种漏洞类型 |
+| `test_callgraph.py` | 调用图工具测试 | 函数调用关系分析 |
 
 ## 使用方法
 
@@ -50,6 +51,15 @@ python analyze_all_vulnerabilities.py ../vulnerable_c full_scan
 
 综合扫描会生成一个 JSON 格式的详细报告文件。
 
+### 调用图工具测试
+
+```bash
+python test_callgraph.py
+
+# 该脚本使用 multi_file_project 作为测试项目
+# 测试 get_callers、get_callees、get_call_chain 和 get_call_graph 功能
+```
+
 ## 输出说明
 
 ### 严重程度图标
@@ -89,7 +99,8 @@ from joern_mcp.services.taint import TaintAnalysisService
 result = await taint_service.check_specific_flow(
     source_pattern="read.*|recv|fgets",
     sink_pattern="system|exec.*|popen",
-    max_flows=20
+    max_flows=20,
+    project_name="my_project"  # 指定项目名称
 )
 ```
 
@@ -99,4 +110,4 @@ result = await taint_service.check_specific_flow(
 2. 脚本会自动选择可用端口启动 Joern 服务器
 3. 扫描完成后会自动停止服务器
 4. 建议在性能较好的机器上运行大型项目扫描
-
+5. 所有服务方法现在都需要指定 `project_name` 参数

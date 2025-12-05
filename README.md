@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" alt="License">
   <img src="https://img.shields.io/badge/MCP-Compatible-purple.svg" alt="MCP Compatible">
-  <img src="https://img.shields.io/badge/Tests-93%25-brightgreen.svg" alt="Test Coverage">
+  <img src="https://img.shields.io/badge/Tests-250%20passed-brightgreen.svg" alt="Tests">
 </p>
 
 **Joern MCP Server** 是一个将 [Joern](https://joern.io/) 代码分析平台与 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 集成的服务器，让大语言模型（LLM）能够直接执行代码安全分析任务。
@@ -15,11 +15,12 @@
 
 | 功能类别 | 描述 | MCP工具 |
 |---------|------|---------|
-| 🔍 **项目管理** | 解析代码、生成CPG、管理项目 | `parse_project`, `list_projects`, `delete_project` |
+| 🔍 **项目管理** | 解析代码、生成CPG、管理项目 | `parse_project`, `list_projects`, `switch_project`, `delete_project` |
 | 📞 **调用图分析** | 函数调用关系追踪、调用链分析 | `get_callers`, `get_callees`, `get_call_chain`, `get_call_graph` |
 | 🌊 **数据流分析** | 变量流向追踪、数据依赖分析 | `track_dataflow`, `analyze_variable_flow`, `find_data_dependencies` |
 | 🛡️ **漏洞检测** | 内置6种漏洞规则、自定义污点分析 | `find_vulnerabilities`, `check_taint_flow`, `list_vulnerability_rules` |
-| ⚙️ **自定义查询** | 执行任意CPGQL查询 | `execute_query`, `health_check` |
+| ⚙️ **控制流分析** | CFG生成、控制结构分析 | `get_control_flow_graph`, `get_dominators`, `analyze_control_structures` |
+| 📊 **代码查询** | 函数查询、代码搜索 | `list_functions`, `get_function_code`, `search_code` |
 
 ---
 
@@ -79,11 +80,15 @@ python -m joern_mcp
 await parse_project("/path/to/c_project", "my-c-app")
 
 # 2. 查找所有漏洞
-result = await find_vulnerabilities(severity="CRITICAL")
+result = await find_vulnerabilities(project_name="my-c-app", severity="CRITICAL")
 print(f"发现 {result['total_count']} 个严重漏洞")
 
 # 3. 追踪特定漏洞流
-flows = await check_taint_flow("gets", "system")
+flows = await check_taint_flow(
+    project_name="my-c-app",
+    source_pattern="gets",
+    sink_pattern="system"
+)
 for flow in flows['flows']:
     print(f"污点从 {flow['source']} 流向 {flow['sink']}")
 ```
@@ -92,12 +97,20 @@ for flow in flows['flows']:
 
 ```python
 # 获取函数的调用者
-callers = await get_callers("vulnerable_function", depth=3)
+callers = await get_callers(
+    project_name="my-c-app",
+    function_name="vulnerable_function",
+    depth=3
+)
 for caller in callers['callers']:
     print(f"{caller['name']} 在 {caller['filename']} 调用了目标函数")
 
 # 生成完整调用图
-graph = await get_call_graph("main", depth=2)
+graph = await get_call_graph(
+    project_name="my-c-app",
+    function_name="main",
+    depth=2
+)
 print(f"调用图包含 {graph['node_count']} 个节点, {graph['edge_count']} 条边")
 ```
 
@@ -105,17 +118,25 @@ print(f"调用图包含 {graph['node_count']} 个节点, {graph['edge_count']} �
 
 ```python
 # 追踪用户输入到危险函数的流向
-flows = await track_dataflow("scanf", "strcpy")
+flows = await track_dataflow(
+    project_name="my-c-app",
+    source_method="scanf",
+    sink_method="strcpy"
+)
 
 # 分析特定变量
-var_flow = await analyze_variable_flow("user_input", sink_method="system")
+var_flow = await analyze_variable_flow(
+    project_name="my-c-app",
+    variable_name="user_input",
+    sink_method="system"
+)
 ```
 
 ---
 
 ## 🔧 配置
 
-创建 `.env` 文件配置服务器：
+创建 `.env` 文件配置服务器（参考 `env.example`）：
 
 ```bash
 # Joern Server配置
@@ -139,6 +160,8 @@ LOG_LEVEL=INFO
 | [安装指南](./docs/INSTALLATION.md) | 详细安装步骤和系统要求 |
 | [用户手册](./docs/USER_GUIDE.md) | 完整使用教程和最佳实践 |
 | [API参考](./docs/API_REFERENCE.md) | MCP工具完整API文档 |
+| [服务API](./docs/SERVICE_API.md) | 底层服务层API文档 |
+| [MCP使用指南](./docs/MCP_USAGE_GUIDE.md) | MCP协议集成指南 |
 | [示例项目](./examples/) | 真实漏洞检测示例 |
 
 ---
@@ -163,7 +186,7 @@ LOG_LEVEL=INFO
 │                      LLM / AI Agent                         │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              ▼ MCP Protocol (stdio)
+                              ▼ MCP Protocol (stdio/http)
 ┌─────────────────────────────────────────────────────────────┐
 │                    Joern MCP Server                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
@@ -172,6 +195,7 @@ LOG_LEVEL=INFO
 │  │ ─ callgraph │  │ ─ dataflow  │  │ ─ Concurrency       │ │
 │  │ ─ dataflow  │  │ ─ taint     │  │ ─ Validation        │ │
 │  │ ─ taint     │  │             │  │                     │ │
+│  │ ─ cfg       │  │             │  │                     │ │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -187,10 +211,10 @@ LOG_LEVEL=INFO
 ## 🧪 测试
 
 ```bash
-# 运行所有测试
-pytest tests/ -v
+# 运行所有单元测试
+pytest tests/ -v --ignore=tests/e2e --ignore=tests/integration
 
-# 只运行单元测试
+# 只运行服务测试
 pytest tests/test_services -v
 
 # 运行集成测试（需要Joern）
@@ -216,7 +240,7 @@ pytest --cov=joern_mcp --cov-report=html
 
 ## 📄 许可证
 
-本项目采用 Apache 2.0 许可证。详见 [LICENSE](./LICENSE) 文件。
+本项目采用 Apache 2.0 许可证。
 
 ---
 
