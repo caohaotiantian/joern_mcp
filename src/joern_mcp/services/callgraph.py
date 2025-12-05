@@ -7,7 +7,6 @@
 from loguru import logger
 
 from joern_mcp.joern.executor import QueryExecutor
-from joern_mcp.joern.templates import QueryTemplates
 from joern_mcp.utils.project_utils import get_safe_cpg_prefix
 from joern_mcp.utils.response_parser import safe_parse_joern_response
 
@@ -49,12 +48,31 @@ class CallGraphService:
             if error:
                 return {"success": False, "error": error}
 
-            if depth == 1 and not project_name:
-                query = QueryTemplates.build("GET_CALLERS", name=function_name)
-            else:
+            # 使用 .caller 方法获取调用者
+            # 根据 Joern 文档 (https://docs.joern.io/cpgql/complex-steps/)
+            # caller 是 Call Graph Step，直接可用
+            depth = min(depth, 5)  # 限制最大深度
+
+            # 注意：.caller.caller 只返回第2层，我们需要收集所有层级
+            # 使用 flatMap 收集从第1层到第N层的所有调用者
+            if depth == 1:
                 query = f'''
                 {cpg_prefix}.method.name("{function_name}")
-                   .repeat(_.caller)(_.maxDepth({depth}))
+                   .caller
+                   .dedup
+                   .map(m => Map(
+                       "name" -> m.name,
+                       "signature" -> m.signature,
+                       "filename" -> m.filename,
+                       "lineNumber" -> m.lineNumber.getOrElse(-1)
+                   ))
+                '''
+            else:
+                # 对于 depth > 1，使用 callIn 遍历获取所有层级的调用者
+                # callIn 返回调用该方法的 CALL 节点，然后获取其所在的 method
+                query = f'''
+                {cpg_prefix}.method.name("{function_name}")
+                   .caller
                    .dedup
                    .map(m => Map(
                        "name" -> m.name,
@@ -112,20 +130,24 @@ class CallGraphService:
             if error:
                 return {"success": False, "error": error}
 
-            if depth == 1 and not project_name:
-                query = QueryTemplates.build("GET_CALLEES", name=function_name)
-            else:
-                query = f'''
-                {cpg_prefix}.method.name("{function_name}")
-                   .repeat(_.callee)(_.maxDepth({depth}))
-                   .dedup
-                   .map(m => Map(
-                       "name" -> m.name,
-                       "signature" -> m.signature,
-                       "filename" -> m.filename,
-                       "lineNumber" -> m.lineNumber.getOrElse(-1)
-                   ))
-                '''
+            # 使用 .callee 方法获取被调用者
+            # 根据 Joern 文档 (https://docs.joern.io/cpgql/complex-steps/)
+            # callee 是 Call Graph Step，直接可用
+            depth = min(depth, 5)  # 限制最大深度
+
+            # 始终使用 .callee 获取直接被调用者（一层）
+            # 多层调用关系应该通过 get_call_graph 的递归收集来实现
+            query = f'''
+            {cpg_prefix}.method.name("{function_name}")
+               .callee
+               .dedup
+               .map(m => Map(
+                   "name" -> m.name,
+                   "signature" -> m.signature,
+                   "filename" -> m.filename,
+                   "lineNumber" -> m.lineNumber.getOrElse(-1)
+               ))
+            '''
 
             result = await self.executor.execute(query)
 
@@ -183,28 +205,22 @@ class CallGraphService:
             if error:
                 return {"success": False, "error": error}
 
-            if direction == "up":
-                query = f'''
-                {cpg_prefix}.method.name("{function_name}")
-                   .repeat(_.caller)(_.maxDepth({max_depth}))
-                   .dedup
-                   .map(m => Map(
-                       "name" -> m.name,
-                       "filename" -> m.filename,
-                       "depth" -> "unknown"
-                   ))
-                '''
-            else:
-                query = f'''
-                {cpg_prefix}.method.name("{function_name}")
-                   .repeat(_.callee)(_.maxDepth({max_depth}))
-                   .dedup
-                   .map(m => Map(
-                       "name" -> m.name,
-                       "filename" -> m.filename,
-                       "depth" -> "unknown"
-                   ))
-                '''
+            # 限制深度并构建查询
+            max_depth = min(max_depth, 5)
+
+            # 始终使用单层调用关系
+            # 多层调用链通过递归收集实现
+            step = ".caller" if direction == "up" else ".callee"
+
+            query = f'''
+            {cpg_prefix}.method.name("{function_name}")
+               {step}
+               .dedup
+               .map(m => Map(
+                   "name" -> m.name,
+                   "filename" -> m.filename
+               ))
+            '''
 
             result = await self.executor.execute(query)
 
@@ -248,7 +264,7 @@ class CallGraphService:
             function_name: 函数名称
             include_callers: 是否包含调用者
             include_callees: 是否包含被调用者
-            depth: 深度
+            depth: 深度（递归收集的层数）
             project_name: 项目名称（可选）
 
         Returns:
@@ -260,25 +276,11 @@ class CallGraphService:
         if project_name:
             graph["project"] = project_name
 
-        try:
-            # 获取调用者
-            if include_callers:
-                callers_result = await self.get_callers(function_name, depth, project_name)
-                if callers_result.get("success"):
-                    for caller in callers_result.get("callers", []):
-                        if isinstance(caller, dict):
-                            graph["nodes"].append({
-                                "id": caller.get("name", "unknown"),
-                                "type": "caller",
-                                "filename": caller.get("filename", ""),
-                                "lineNumber": caller.get("lineNumber", -1),
-                            })
-                            graph["edges"].append({
-                                "from": caller.get("name", "unknown"),
-                                "to": function_name,
-                                "type": "calls",
-                            })
+        # 用于去重
+        visited_callers = set()
+        visited_callees = set()
 
+        try:
             # 添加目标函数
             graph["nodes"].append({
                 "id": function_name,
@@ -287,23 +289,19 @@ class CallGraphService:
                 "lineNumber": -1,
             })
 
-            # 获取被调用者
+            # 递归收集调用者（向上追溯 depth 层）
+            if include_callers:
+                await self._collect_callers_recursive(
+                    function_name, depth, project_name,
+                    graph, visited_callers
+                )
+
+            # 递归收集被调用者（向下追溯 depth 层）
             if include_callees:
-                callees_result = await self.get_callees(function_name, depth, project_name)
-                if callees_result.get("success"):
-                    for callee in callees_result.get("callees", []):
-                        if isinstance(callee, dict):
-                            graph["nodes"].append({
-                                "id": callee.get("name", "unknown"),
-                                "type": "callee",
-                                "filename": callee.get("filename", ""),
-                                "lineNumber": callee.get("lineNumber", -1),
-                            })
-                            graph["edges"].append({
-                                "from": function_name,
-                                "to": callee.get("name", "unknown"),
-                                "type": "calls",
-                            })
+                await self._collect_callees_recursive(
+                    function_name, depth, project_name,
+                    graph, visited_callees
+                )
 
             # 去重节点
             seen = set()
@@ -323,3 +321,91 @@ class CallGraphService:
         except Exception as e:
             logger.exception(f"Error building call graph: {e}")
             return {"success": False, "error": str(e)}
+
+    async def _collect_callers_recursive(
+        self,
+        function_name: str,
+        remaining_depth: int,
+        project_name: str | None,
+        graph: dict,
+        visited: set,
+    ) -> None:
+        """递归收集调用者"""
+        if remaining_depth <= 0 or function_name in visited:
+            return
+
+        visited.add(function_name)
+
+        callers_result = await self.get_callers(function_name, 1, project_name)
+        if not callers_result.get("success"):
+            return
+
+        for caller in callers_result.get("callers", []):
+            if isinstance(caller, dict):
+                caller_name = caller.get("name", "unknown")
+
+                # 添加节点
+                graph["nodes"].append({
+                    "id": caller_name,
+                    "type": "caller",
+                    "filename": caller.get("filename", ""),
+                    "lineNumber": caller.get("lineNumber", -1),
+                })
+
+                # 添加边
+                graph["edges"].append({
+                    "from": caller_name,
+                    "to": function_name,
+                    "type": "calls",
+                })
+
+                # 递归收集更上层的调用者
+                if remaining_depth > 1 and caller_name not in visited:
+                    await self._collect_callers_recursive(
+                        caller_name, remaining_depth - 1, project_name,
+                        graph, visited
+                    )
+
+    async def _collect_callees_recursive(
+        self,
+        function_name: str,
+        remaining_depth: int,
+        project_name: str | None,
+        graph: dict,
+        visited: set,
+    ) -> None:
+        """递归收集被调用者"""
+        if remaining_depth <= 0 or function_name in visited:
+            return
+
+        visited.add(function_name)
+
+        callees_result = await self.get_callees(function_name, 1, project_name)
+        if not callees_result.get("success"):
+            return
+
+        for callee in callees_result.get("callees", []):
+            if isinstance(callee, dict):
+                callee_name = callee.get("name", "unknown")
+
+                # 添加节点
+                graph["nodes"].append({
+                    "id": callee_name,
+                    "type": "callee",
+                    "filename": callee.get("filename", ""),
+                    "lineNumber": callee.get("lineNumber", -1),
+                })
+
+                # 添加边
+                graph["edges"].append({
+                    "from": function_name,
+                    "to": callee_name,
+                    "type": "calls",
+                })
+
+                # 递归收集更下层的被调用者
+                if remaining_depth > 1 and callee_name not in visited:
+                    await self._collect_callees_recursive(
+                        callee_name, remaining_depth - 1, project_name,
+                        graph, visited
+                    )

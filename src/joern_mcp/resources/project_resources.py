@@ -19,11 +19,23 @@ async def list_projects_resource() -> str:
         if not server_state.query_executor:
             return '{"success": false, "error": "Query executor not initialized"}'
 
-        query = "workspace.projects.name.l"
-        result = await server_state.query_executor.execute(query)
+        # workspace.projects 返回 List[Project]
+        # 使用 .map(_.name) 提取名称列表
+        query = "workspace.projects.map(_.name).l"
+        result = await server_state.query_executor.execute(query, format="raw")
 
         if result.get("success"):
-            return result.get("stdout", "[]")
+            stdout = result.get("stdout", "[]").strip()
+            # 解析 Scala List 格式 List("name1", "name2")
+            import re
+            list_match = re.search(r'List\s*\((.*)\)', stdout, re.DOTALL)
+            if list_match:
+                content = list_match.group(1)
+                # 提取引号内的字符串
+                names = re.findall(r'"([^"]*)"', content)
+                import orjson
+                return orjson.dumps({"success": True, "projects": names}).decode()
+            return f'{{"success": true, "projects": [], "raw": "{stdout}"}}'
         else:
             return f'{{"success": false, "error": "{result.get("stderr", "Unknown error")}"}}'
     except Exception as e:

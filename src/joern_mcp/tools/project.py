@@ -15,12 +15,51 @@
 所有与 Joern Server 的交互都通过异步 HTTP+WebSocket 方式进行。
 """
 
+import re
 from pathlib import Path
 
 from loguru import logger
 
 from joern_mcp.mcp_server import mcp, server_state
 from joern_mcp.utils.response_parser import safe_parse_joern_response
+
+
+def _parse_int_from_output(stdout: str) -> int:
+    """从 Joern 输出中解析整数值
+
+    Joern 返回的格式可能包括：
+    - 直接数字: "123"
+    - Scala REPL 格式: "val res1: Int = 123"
+    - 带类型: "res1: Int = 123"
+
+    Args:
+        stdout: Joern 输出
+
+    Returns:
+        解析出的整数，解析失败返回 0
+    """
+    if not stdout:
+        return 0
+
+    clean = stdout.strip()
+
+    # 尝试直接解析数字
+    if clean.isdigit():
+        return int(clean)
+
+    # 尝试从 "val res1: Int = 123" 格式提取
+    # 或 "res1: Int = 123" 格式
+    match = re.search(r'=\s*(\d+)', clean)
+    if match:
+        return int(match.group(1))
+
+    # 尝试查找任何数字
+    numbers = re.findall(r'\b(\d+)\b', clean)
+    if numbers:
+        # 返回最后一个数字（通常是结果值）
+        return int(numbers[-1])
+
+    return 0
 
 
 @mcp.tool()
@@ -183,30 +222,23 @@ async def get_current_project() -> dict:
                 "error": "No active project. Use parse_project to import a project first.",
             }
 
-        # 获取项目统计信息
-        stats_query = """
-        {
-            val methods = cpg.method.size
-            val files = cpg.file.size
-            s"${methods},${files}"
-        }
-        """
-        stats_result = await server_state.joern_server.execute_query_async(stats_query)
-
+        # 获取项目统计信息 - 分开查询更可靠
         method_count = 0
         file_count = 0
 
-        if stats_result.get("success"):
-            stats_str = safe_parse_joern_response(
-                stats_result.get("stdout", ""), default=""
-            )
-            if isinstance(stats_str, str) and "," in stats_str:
-                parts = stats_str.split(",")
-                try:
-                    method_count = int(parts[0])
-                    file_count = int(parts[1])
-                except (ValueError, IndexError):
-                    pass
+        # 获取方法数量
+        method_query = "cpg.method.size"
+        method_result = await server_state.joern_server.execute_query_async(method_query)
+        if method_result.get("success"):
+            method_stdout = method_result.get("stdout", "").strip()
+            method_count = _parse_int_from_output(method_stdout)
+
+        # 获取文件数量
+        file_query = "cpg.file.size"
+        file_result = await server_state.joern_server.execute_query_async(file_query)
+        if file_result.get("success"):
+            file_stdout = file_result.get("stdout", "").strip()
+            file_count = _parse_int_from_output(file_stdout)
 
         # 查找匹配的项目名称
         projects_query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
@@ -342,41 +374,208 @@ async def list_projects() -> dict:
 
 
 @mcp.tool()
-async def delete_project(project_name: str) -> dict:
+async def delete_project(project_name: str, permanent: bool = True) -> dict:
     """
     删除指定项目的CPG
 
     Args:
         project_name: 要删除的项目名称
+        permanent: 是否永久删除（包括磁盘数据）
+                   True: 使用 delete() 彻底删除
+                   False: 使用 close() 仅关闭项目
 
     Returns:
         dict: 删除结果
 
     Example:
         >>> await delete_project("my-app")
-        {"success": True, "message": "Project deleted"}
+        {"success": True, "message": "Project deleted permanently"}
+
+    Note:
+        - permanent=True（默认）: 使用 Joern 的 delete() 命令，
+          彻底删除项目及其在磁盘上的数据
+        - permanent=False: 使用 Joern 的 close() 命令，
+          仅关闭项目，数据保留在 workspace 中
     """
     if not server_state.joern_server:
         return {"success": False, "error": "Joern server not initialized"}
 
     try:
-        # Joern的close命令（使用异步方法）
-        query = f'close("{project_name}")'
+        if permanent:
+            # 使用 delete 命令彻底删除项目（包括磁盘数据）
+            query = f'delete("{project_name}")'
+            action = "deleted permanently"
+        else:
+            # 使用 close 命令仅关闭项目
+            query = f'close("{project_name}")'
+            action = "closed"
+
         result = await server_state.joern_server.execute_query_async(query)
 
         if result.get("success"):
-            logger.info(f"Project {project_name} deleted")
+            logger.info(f"Project {project_name} {action}")
             return {
                 "success": True,
                 "project_name": project_name,
-                "message": "Project deleted successfully",
+                "message": f"Project {action} successfully",
+                "permanent": permanent,
             }
         else:
             return {
                 "success": False,
-                "error": result.get("stderr", "Failed to delete project"),
+                "error": result.get("stderr", f"Failed to {action.split()[0]} project"),
             }
 
     except Exception as e:
         logger.exception(f"Error deleting project: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def cleanup_inactive_projects(keep_active: bool = True) -> dict:
+    """
+    清理所有非活跃项目
+
+    这个工具用于批量删除 workspace 中的非活跃项目，
+    释放磁盘空间并保持 workspace 整洁。
+
+    Args:
+        keep_active: 是否保留当前活跃项目（默认 True）
+
+    Returns:
+        dict: 清理结果，包含删除的项目列表
+
+    Example:
+        >>> await cleanup_inactive_projects()
+        {
+            "success": true,
+            "deleted": ["old-project-1", "old-project-2"],
+            "kept": ["current-project"],
+            "deleted_count": 2
+        }
+
+    Warning:
+        此操作不可逆！删除的项目数据将永久丢失。
+    """
+    if not server_state.joern_server:
+        return {"success": False, "error": "Joern server not initialized"}
+
+    try:
+        # 首先获取当前活动项目
+        root_query = "cpg.metaData.root.headOption.getOrElse(\"\")"
+        root_result = await server_state.joern_server.execute_query_async(root_query)
+        current_root = ""
+        if root_result.get("success"):
+            current_root = safe_parse_joern_response(
+                root_result.get("stdout", ""), default=""
+            )
+
+        # 获取所有项目
+        projects_query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
+        projects_result = await server_state.joern_server.execute_query_async(projects_query)
+
+        if not projects_result.get("success"):
+            return {
+                "success": False,
+                "error": projects_result.get("stderr", "Failed to list projects"),
+            }
+
+        raw_projects = safe_parse_joern_response(
+            projects_result.get("stdout", ""), default=[]
+        )
+
+        if not isinstance(raw_projects, list):
+            raw_projects = [raw_projects] if raw_projects else []
+
+        deleted = []
+        kept = []
+        errors = []
+
+        for p_str in raw_projects:
+            if not isinstance(p_str, str) or ":::" not in p_str:
+                continue
+
+            parts = p_str.split(":::", 1)
+            if len(parts) != 2:
+                continue
+
+            name = parts[0]
+            input_path = parts[1]
+            is_active = input_path == current_root
+
+            if is_active and keep_active:
+                kept.append(name)
+                continue
+
+            # 删除非活跃项目
+            delete_query = f'delete("{name}")'
+            delete_result = await server_state.joern_server.execute_query_async(delete_query)
+
+            if delete_result.get("success"):
+                deleted.append(name)
+                logger.info(f"Deleted inactive project: {name}")
+            else:
+                errors.append({
+                    "name": name,
+                    "error": delete_result.get("stderr", "Unknown error"),
+                })
+                logger.warning(f"Failed to delete project {name}: {delete_result.get('stderr')}")
+
+        return {
+            "success": True,
+            "deleted": deleted,
+            "kept": kept,
+            "deleted_count": len(deleted),
+            "kept_count": len(kept),
+            "errors": errors if errors else None,
+        }
+
+    except Exception as e:
+        logger.exception(f"Error cleaning up projects: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def close_project(project_name: str) -> dict:
+    """
+    关闭指定项目（不删除数据）
+
+    与 delete_project 不同，close_project 只是关闭项目，
+    数据仍然保留在 workspace 中，可以稍后重新打开。
+
+    Args:
+        project_name: 要关闭的项目名称
+
+    Returns:
+        dict: 关闭结果
+
+    Example:
+        >>> await close_project("my-app")
+        {"success": True, "message": "Project closed"}
+
+    Note:
+        使用 switch_project 或 parse_project 可以重新打开已关闭的项目。
+    """
+    if not server_state.joern_server:
+        return {"success": False, "error": "Joern server not initialized"}
+
+    try:
+        query = f'close("{project_name}")'
+        result = await server_state.joern_server.execute_query_async(query)
+
+        if result.get("success"):
+            logger.info(f"Project {project_name} closed")
+            return {
+                "success": True,
+                "project_name": project_name,
+                "message": "Project closed successfully",
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("stderr", "Failed to close project"),
+            }
+
+    except Exception as e:
+        logger.exception(f"Error closing project: {e}")
         return {"success": False, "error": str(e)}

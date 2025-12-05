@@ -81,19 +81,28 @@ class JoernHTTPClient:
         return f"ws://{self.endpoint}/connect"
 
     def _post_query_endpoint(self) -> str:
-        """POST查询端点"""
+        """POST查询端点（异步模式）"""
         return f"http://{self.endpoint}/query"
+
+    def _post_query_sync_endpoint(self) -> str:
+        """POST查询端点（同步模式，直接返回结果）
+
+        参考: https://docs.joern.io/server/
+        """
+        return f"http://{self.endpoint}/query-sync"
 
     def _get_result_endpoint(self, uuid: str) -> str:
         """GET结果端点"""
         return f"http://{self.endpoint}/result/{uuid}"
 
-    async def execute(self, query: str) -> dict[str, Any]:
+    async def execute(self, query: str, use_sync_endpoint: bool = False) -> dict[str, Any]:
         """
-        执行CPGQL查询（完全异步）
+        执行CPGQL查询
 
         Args:
             query: CPGQL查询字符串
+            use_sync_endpoint: 是否使用同步端点（/query-sync）
+                              同步端点更简单但不支持长时间运行的查询
 
         Returns:
             查询结果（纯JSON，无ANSI颜色码）
@@ -105,7 +114,75 @@ class JoernHTTPClient:
         semaphore = _get_semaphore()
 
         async with semaphore:
-            return await self._execute_internal(query)
+            if use_sync_endpoint:
+                return await self._execute_sync(query)
+
+            # 尝试 WebSocket 异步模式，失败时自动回退到同步模式
+            result = await self._execute_internal(query)
+
+            # 如果 WebSocket 连接失败（404），尝试同步模式
+            if not result.get("success") and "HTTP 404" in result.get("stderr", ""):
+                logger.warning("WebSocket endpoint not available, falling back to sync endpoint")
+                return await self._execute_sync(query)
+
+            return result
+
+    async def _execute_sync(self, query: str) -> dict[str, Any]:
+        """使用同步端点执行查询（/query-sync）
+
+        参考: https://docs.joern.io/server/
+        这是一个更简单的方式，直接 POST 查询并获取结果，
+        不需要 WebSocket 连接。适合简单查询。
+        """
+        try:
+            sync_endpoint = self._post_query_sync_endpoint()
+            logger.debug(f"POST同步查询到: {sync_endpoint}")
+
+            response = requests.post(
+                sync_endpoint,
+                json={"query": query},
+                auth=self.auth,
+                timeout=self.timeout,
+            )
+            logger.debug(f"同步查询响应状态: {response.status_code}")
+
+            if response.status_code == 401:
+                raise Exception("Basic authentication failed")
+            elif response.status_code != 200:
+                raise Exception(
+                    f"Sync query failed: HTTP {response.status_code}, body: {response.text}"
+                )
+
+            raw_result = response.json()
+            logger.debug(f"同步查询成功: {query[:50]}...")
+
+            # 处理错误响应
+            if "err" in raw_result:
+                error_msg = raw_result["err"]
+                logger.error(f"Joern Server error: {error_msg}")
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Joern Error: {error_msg}",
+                }
+
+            # 移除 ANSI 颜色控制码
+            stdout_content = raw_result.get("stdout", "")
+            clean_stdout = strip_ansi_codes(stdout_content)
+
+            return {
+                "success": True,
+                "stdout": clean_stdout,
+                "stderr": "",
+            }
+
+        except Exception as e:
+            logger.error(f"Sync query execution failed: {e}")
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Execution Error: {e}",
+            }
 
     async def _execute_internal(self, query: str) -> dict[str, Any]:
         """内部执行方法（在信号量保护下调用）"""

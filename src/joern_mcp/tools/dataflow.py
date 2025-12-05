@@ -5,7 +5,7 @@
 - analyze_variable_flow: 分析变量流向
 - find_data_dependencies: 查找数据依赖
 
-多项目支持：所有工具支持可选的 project_name 参数。
+多项目支持：所有工具要求指定 project_name 参数。
 """
 
 from joern_mcp.mcp_server import mcp, server_state
@@ -14,25 +14,25 @@ from joern_mcp.services.dataflow import DataFlowService
 
 @mcp.tool()
 async def track_dataflow(
+    project_name: str,
     source_method: str,
     sink_method: str,
     max_flows: int = 10,
-    project_name: str | None = None,
 ) -> dict:
     """
     追踪从源方法到汇方法的数据流
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         source_method: 源方法名称
         sink_method: 汇方法名称
         max_flows: 最大流数量（默认10，最大50）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 数据流信息
 
     Example:
-        >>> await track_dataflow("gets", "system", project_name="webapp")
+        >>> await track_dataflow("webapp", "gets", "system")
         {
             "success": true,
             "project": "webapp",
@@ -54,25 +54,25 @@ async def track_dataflow(
 
 @mcp.tool()
 async def analyze_variable_flow(
+    project_name: str,
     variable_name: str,
     sink_method: str | None = None,
     max_flows: int = 10,
-    project_name: str | None = None,
 ) -> dict:
     """
     分析变量的数据流
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         variable_name: 变量名称
         sink_method: 目标汇方法（可选）
         max_flows: 最大流数量（默认10，最大50）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 变量流信息
 
     Example:
-        >>> await analyze_variable_flow("user_input", sink_method="system", project_name="webapp")
+        >>> await analyze_variable_flow("webapp", "user_input", sink_method="system")
         {
             "success": true,
             "project": "webapp",
@@ -93,23 +93,23 @@ async def analyze_variable_flow(
 
 @mcp.tool()
 async def find_data_dependencies(
+    project_name: str,
     function_name: str,
     variable_name: str | None = None,
-    project_name: str | None = None,
 ) -> dict:
     """
     查找函数中的数据依赖关系
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_name: 函数名称
         variable_name: 变量名称（可选，如果指定则只查找该变量）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 数据依赖信息
 
     Example:
-        >>> await find_data_dependencies("main", variable_name="buf", project_name="webapp")
+        >>> await find_data_dependencies("webapp", "main", variable_name="buf")
         {
             "success": true,
             "project": "webapp",

@@ -68,6 +68,53 @@ def _parse_scala_list(value: str) -> list:
     return items
 
 
+def _recursively_parse_json(data: Any, max_depth: int = 5) -> Any:
+    """递归解析可能多重编码的 JSON 数据
+
+    Args:
+        data: 要解析的数据
+        max_depth: 最大递归深度
+
+    Returns:
+        完全解析后的数据
+    """
+    if max_depth <= 0:
+        return data
+
+    # 如果是字符串，尝试解析为 JSON
+    if isinstance(data, str):
+        data_stripped = data.strip()
+        # 移除多余的首尾双引号（如 '""[...]""'）
+        while (data_stripped.startswith('""') and data_stripped.endswith('""')
+               and len(data_stripped) > 4):
+            data_stripped = data_stripped[2:-2]
+        # 单层引号包裹
+        while (data_stripped.startswith('"') and data_stripped.endswith('"')
+               and len(data_stripped) > 2):
+            inner = data_stripped[1:-1]
+            # 检查内部是否像 JSON
+            if inner.startswith('[') or inner.startswith('{'):
+                data_stripped = inner
+                break
+            else:
+                break
+
+        with contextlib.suppress(json.JSONDecodeError):
+            parsed = json.loads(data_stripped)
+            return _recursively_parse_json(parsed, max_depth - 1)
+        return data_stripped
+
+    # 如果是列表，递归解析每个元素
+    if isinstance(data, list):
+        return [_recursively_parse_json(item, max_depth - 1) for item in data]
+
+    # 如果是字典，递归解析每个值
+    if isinstance(data, dict):
+        return {k: _recursively_parse_json(v, max_depth - 1) for k, v in data.items()}
+
+    return data
+
+
 def parse_joern_response(stdout: str) -> Any:
     """
     解析 Joern Server 响应中的数据
@@ -77,7 +124,7 @@ def parse_joern_response(stdout: str) -> Any:
     2. Scala REPL JSON: `val res1: String = "[{\"name\": \"main\", ...}]"`
     3. Scala REPL String: `val res1: String = "/path/to/project"`
     4. Scala REPL List: `val res1: List[String] = List("item1", "item2")`
-    5. 双重编码: JSON 字符串作为 JSON 字符串返回
+    5. 双重/多重编码: JSON 字符串作为 JSON 字符串返回
 
     Args:
         stdout: Joern Server 返回的 stdout 内容（已去除 ANSI 码）
@@ -93,14 +140,16 @@ def parse_joern_response(stdout: str) -> Any:
 
     clean_output = stdout.strip()
 
+    # 预处理：移除多余的首尾双引号
+    while (clean_output.startswith('""') and clean_output.endswith('""')
+           and len(clean_output) > 4):
+        clean_output = clean_output[2:-2]
+
     # 尝试方法 1: 直接解析 JSON
     try:
         data = json.loads(clean_output)
-        # 处理双重编码（JSON 字符串内嵌 JSON）
-        if isinstance(data, str):
-            with contextlib.suppress(json.JSONDecodeError):
-                data = json.loads(data)
-        return data
+        # 递归处理多重编码
+        return _recursively_parse_json(data)
     except json.JSONDecodeError:
         pass
 
@@ -113,10 +162,7 @@ def parse_joern_response(stdout: str) -> Any:
         # 2a: 尝试解析为 JSON
         try:
             data = json.loads(value_part)
-            if isinstance(data, str):
-                with contextlib.suppress(json.JSONDecodeError):
-                    data = json.loads(data)
-            return data
+            return _recursively_parse_json(data)
         except json.JSONDecodeError:
             pass
 
@@ -133,10 +179,7 @@ def parse_joern_response(stdout: str) -> Any:
     if json_match:
         try:
             data = json.loads(json_match.group(1))
-            if isinstance(data, str):
-                with contextlib.suppress(json.JSONDecodeError):
-                    data = json.loads(data)
-            return data
+            return _recursively_parse_json(data)
         except json.JSONDecodeError:
             pass
 

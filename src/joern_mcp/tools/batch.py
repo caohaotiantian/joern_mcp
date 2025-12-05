@@ -4,8 +4,8 @@
 - batch_query: 批量执行查询
 - batch_function_analysis: 批量分析函数
 
-多项目支持：batch_function_analysis 支持 project_name 参数。
-batch_query 执行原始查询，用户可在查询中自行指定项目。
+多项目支持：batch_function_analysis 要求指定 project_name 参数。
+batch_query 执行原始查询，用户需在查询中自行指定项目前缀。
 """
 
 import asyncio
@@ -30,8 +30,8 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
 
     Example:
         >>> await batch_query([
-        ...     "cpg.method.name.l",
-        ...     "cpg.call.name.l"
+        ...     'workspace.project("myproject").get.cpg.get.method.name.l',
+        ...     'workspace.project("myproject").get.cpg.get.call.name.l'
         ... ])
         {
             "success": true,
@@ -42,7 +42,7 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
         }
 
     Note:
-        查询使用原始 Scala 语法。如需查询特定项目，在查询中使用：
+        查询使用原始 Scala 语法。必须在查询中指定项目：
         workspace.project("name").get.cpg.get.method.name.l
     """
     if not server_state.query_executor:
@@ -106,20 +106,20 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
 
 @mcp.tool()
 async def batch_function_analysis(
-    function_names: list[str], project_name: str | None = None
+    project_name: str, function_names: list[str]
 ) -> dict:
     """
     批量分析多个函数
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_names: 函数名称列表
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 批量分析结果
 
     Example:
-        >>> await batch_function_analysis(["main", "init"], project_name="webapp")
+        >>> await batch_function_analysis("webapp", ["main", "init"])
         {
             "success": true,
             "project": "webapp",
@@ -137,7 +137,7 @@ async def batch_function_analysis(
     if len(function_names) > 10:
         return {"success": False, "error": "Maximum 10 functions allowed in batch"}
 
-    logger.info(f"Batch analyzing {len(function_names)} functions (project: {project_name or 'current'})")
+    logger.info(f"Batch analyzing {len(function_names)} functions (project: {project_name})")
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
@@ -183,15 +183,13 @@ async def batch_function_analysis(
             else:
                 analyses[func_name] = {"error": result.get("stderr", "Query failed")}
 
-        response = {
+        return {
             "success": True,
+            "project": project_name,
             "analyses": analyses,
             "count": len(function_names),
             "analyzed": sum(1 for v in analyses.values() if v and "error" not in v),
         }
-        if project_name:
-            response["project"] = project_name
-        return response
 
     except Exception as e:
         logger.exception(f"Error in batch function analysis: {e}")

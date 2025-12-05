@@ -6,9 +6,9 @@
 - search_code: 搜索代码模式
 
 多项目支持：
-- 所有查询工具支持可选的 project_name 参数
-- 不指定 project_name 时，查询当前活动项目
-- 指定 project_name 时，仅在该项目范围内查询
+- 所有查询工具要求指定 project_name 参数
+- 使用 list_projects 查看可用项目
+- 使用 parse_project 导入新项目
 """
 
 from loguru import logger
@@ -20,21 +20,21 @@ from joern_mcp.utils.response_parser import safe_parse_joern_response
 
 @mcp.tool()
 async def get_function_code(
-    function_name: str, file_filter: str | None = None, project_name: str | None = None
+    project_name: str, function_name: str, file_filter: str | None = None
 ) -> dict:
     """
     获取指定函数的源代码
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_name: 函数名称（支持正则表达式）
         file_filter: 文件路径过滤（可选，正则表达式）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 函数信息，包含源代码、位置等
 
     Example:
-        >>> await get_function_code("buffer_overflow", project_name="webapp")
+        >>> await get_function_code("webapp", "buffer_overflow")
         {
             "success": true,
             "project": "webapp",
@@ -54,7 +54,7 @@ async def get_function_code(
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
-    logger.info(f"Getting function code: {function_name} (project: {project_name or 'current'})")
+    logger.info(f"Getting function code: {function_name} (project: {project_name})")
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
@@ -99,14 +99,12 @@ async def get_function_code(
             if not isinstance(functions, list):
                 functions = [functions] if functions else []
 
-            response = {
+            return {
                 "success": True,
+                "project": project_name,
                 "functions": functions,
                 "count": len(functions),
             }
-            if project_name:
-                response["project"] = project_name
-            return response
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -117,21 +115,21 @@ async def get_function_code(
 
 @mcp.tool()
 async def list_functions(
-    name_filter: str | None = None, limit: int = 100, project_name: str | None = None
+    project_name: str, name_filter: str | None = None, limit: int = 100
 ) -> dict:
     """
     列出所有函数
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         name_filter: 名称过滤（正则表达式，可选）
         limit: 返回数量限制（默认100）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 函数列表，每个函数包含名称、文件名和行号
 
     Example:
-        >>> await list_functions(limit=5, project_name="webapp")
+        >>> await list_functions("webapp", limit=5)
         {
             "success": true,
             "project": "webapp",
@@ -146,7 +144,7 @@ async def list_functions(
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
-    logger.info(f"Listing functions (filter: {name_filter}, limit: {limit}, project: {project_name or 'current'})")
+    logger.info(f"Listing functions (filter: {name_filter}, limit: {limit}, project: {project_name})")
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
@@ -186,14 +184,12 @@ async def list_functions(
             if not isinstance(functions, list):
                 functions = [functions] if functions else []
 
-            response = {
+            return {
                 "success": True,
+                "project": project_name,
                 "functions": functions,
                 "count": len(functions),
             }
-            if project_name:
-                response["project"] = project_name
-            return response
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
 
@@ -204,21 +200,26 @@ async def list_functions(
 
 @mcp.tool()
 async def search_code(
-    pattern: str, scope: str = "all", project_name: str | None = None
+    project_name: str, pattern: str, scope: str = "all"
 ) -> dict:
     """
     搜索代码
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         pattern: 搜索模式（正则表达式）
-        scope: 搜索范围 (all, methods, calls, identifiers)
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
+        scope: 搜索范围
+            - "all": 搜索调用和标识符（默认）
+            - "methods": 搜索方法/函数名
+            - "calls": 搜索函数调用
+            - "identifiers": 搜索标识符/变量名
+            - "literals": 搜索字面量
 
     Returns:
         dict: 匹配结果，包含代码、类型、文件和行号
 
     Example:
-        >>> await search_code("strcpy", scope="calls", project_name="webapp")
+        >>> await search_code("webapp", "strcpy", scope="calls")
         {
             "success": true,
             "project": "webapp",
@@ -237,7 +238,7 @@ async def search_code(
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
-    logger.info(f"Searching code: {pattern} in {scope} (project: {project_name or 'current'})")
+    logger.info(f"Searching code: {pattern} in {scope} (project: {project_name})")
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
@@ -247,20 +248,50 @@ async def search_code(
 
         # 根据scope构建查询
         if scope == "methods":
-            query = f'{cpg_prefix}.method.name(".*{pattern}.*")'
+            # 搜索方法名
+            query = f'''{cpg_prefix}.method.name(".*{pattern}.*").take(50).map(n => Map(
+                "code" -> n.name,
+                "type" -> "METHOD",
+                "file" -> n.filename,
+                "line" -> n.lineNumber.getOrElse(-1)
+            ))'''
         elif scope == "calls":
-            query = f'{cpg_prefix}.call.name(".*{pattern}.*")'
+            # 搜索函数调用
+            query = f'''{cpg_prefix}.call.name(".*{pattern}.*").take(50).map(n => Map(
+                "code" -> n.code,
+                "type" -> "CALL",
+                "file" -> n.file.name.headOption.getOrElse("unknown"),
+                "line" -> n.lineNumber.getOrElse(-1)
+            ))'''
         elif scope == "identifiers":
-            query = f'{cpg_prefix}.identifier.name(".*{pattern}.*")'
-        else:  # all
-            query = f'{cpg_prefix}.all.code(".*{pattern}.*")'
-
-        query += """.take(50).map(n => Map(
-            "code" -> n.code,
-            "type" -> n.label,
-            "file" -> n.file.name.headOption.getOrElse("unknown"),
-            "line" -> n.lineNumber.getOrElse(-1)
-        ))"""
+            # 搜索标识符
+            query = f'''{cpg_prefix}.identifier.name(".*{pattern}.*").take(50).map(n => Map(
+                "code" -> n.code,
+                "type" -> "IDENTIFIER",
+                "file" -> n.file.name.headOption.getOrElse("unknown"),
+                "line" -> n.lineNumber.getOrElse(-1)
+            ))'''
+        elif scope == "literals":
+            # 搜索字面量
+            query = f'''{cpg_prefix}.literal.code(".*{pattern}.*").take(50).map(n => Map(
+                "code" -> n.code,
+                "type" -> "LITERAL",
+                "file" -> n.file.name.headOption.getOrElse("unknown"),
+                "line" -> n.lineNumber.getOrElse(-1)
+            ))'''
+        else:  # all - 搜索调用和标识符
+            # 使用 call 和 identifier 的组合来搜索
+            query = f'''{cpg_prefix}.call.code(".*{pattern}.*").take(25).map(n => Map(
+                "code" -> n.code,
+                "type" -> "CALL",
+                "file" -> n.file.name.headOption.getOrElse("unknown"),
+                "line" -> n.lineNumber.getOrElse(-1)
+            )) ++ {cpg_prefix}.identifier.name(".*{pattern}.*").take(25).map(n => Map(
+                "code" -> n.code,
+                "type" -> "IDENTIFIER",
+                "file" -> n.file.name.headOption.getOrElse("unknown"),
+                "line" -> n.lineNumber.getOrElse(-1)
+            ))'''
 
         # 执行查询
         result = await server_state.query_executor.execute(query)
@@ -272,15 +303,13 @@ async def search_code(
             if not isinstance(matches, list):
                 matches = [matches] if matches else []
 
-            response = {
+            return {
                 "success": True,
+                "project": project_name,
                 "matches": matches,
                 "count": len(matches),
                 "scope": scope,
             }
-            if project_name:
-                response["project"] = project_name
-            return response
         else:
             return {"success": False, "error": result.get("stderr", "Query failed")}
 

@@ -6,7 +6,7 @@
 - get_call_chain: 获取函数的调用链
 - get_call_graph: 获取完整调用图
 
-多项目支持：所有工具支持可选的 project_name 参数指定项目范围。
+多项目支持：所有工具要求指定 project_name 参数。
 """
 
 from joern_mcp.mcp_server import mcp, server_state
@@ -15,21 +15,21 @@ from joern_mcp.services.callgraph import CallGraphService
 
 @mcp.tool()
 async def get_callers(
-    function_name: str, depth: int = 1, project_name: str | None = None
+    project_name: str, function_name: str, depth: int = 1
 ) -> dict:
     """
     获取函数的调用者
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_name: 函数名称
         depth: 调用深度（默认1层，最大10层）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 调用者列表
 
     Example:
-        >>> await get_callers("buffer_overflow", depth=2, project_name="webapp")
+        >>> await get_callers("webapp", "buffer_overflow", depth=2)
         {
             "success": true,
             "project": "webapp",
@@ -57,21 +57,21 @@ async def get_callers(
 
 @mcp.tool()
 async def get_callees(
-    function_name: str, depth: int = 1, project_name: str | None = None
+    project_name: str, function_name: str, depth: int = 1
 ) -> dict:
     """
     获取函数调用的其他函数
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_name: 函数名称
         depth: 调用深度（默认1层，最大10层）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 被调用函数列表
 
     Example:
-        >>> await get_callees("buffer_overflow", depth=1, project_name="webapp")
+        >>> await get_callees("webapp", "buffer_overflow", depth=1)
         {
             "success": true,
             "project": "webapp",
@@ -98,25 +98,25 @@ async def get_callees(
 
 @mcp.tool()
 async def get_call_chain(
+    project_name: str,
     function_name: str,
     max_depth: int = 5,
     direction: str = "up",
-    project_name: str | None = None,
 ) -> dict:
     """
     获取函数的调用链
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_name: 函数名称
         max_depth: 最大深度（默认5层，最大10层）
         direction: 方向 ("up"=调用者链, "down"=被调用者链)
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 调用链数据
 
     Example:
-        >>> await get_call_chain("strcpy", max_depth=3, direction="up", project_name="webapp")
+        >>> await get_call_chain("webapp", "strcpy", max_depth=3, direction="up")
         {
             "success": true,
             "project": "webapp",
@@ -144,27 +144,27 @@ async def get_call_chain(
 
 @mcp.tool()
 async def get_call_graph(
+    project_name: str,
     function_name: str,
     include_callers: bool = True,
     include_callees: bool = True,
     depth: int = 2,
-    project_name: str | None = None,
 ) -> dict:
     """
     获取函数的完整调用图
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         function_name: 函数名称
         include_callers: 是否包含调用者（默认True）
         include_callees: 是否包含被调用者（默认True）
         depth: 深度（默认2层，最大5层）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 调用图数据（包含节点和边）
 
     Example:
-        >>> await get_call_graph("buffer_overflow", depth=1, project_name="webapp")
+        >>> await get_call_graph("webapp", "buffer_overflow", depth=1)
         {
             "success": true,
             "project": "webapp",

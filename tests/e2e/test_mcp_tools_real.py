@@ -6,6 +6,8 @@ MCP工具真实端到端测试
 
 注意：MCP 工具函数被 @mcp.tool() 装饰后变成 FunctionTool 对象，
 需要通过 .fn 属性获取原始函数来调用。
+
+更新：所有查询工具现在要求 project_name 作为第一个必填参数。
 """
 
 import pytest
@@ -26,6 +28,10 @@ def get_tool_fn(tool):
     return tool
 
 
+# 测试项目名称常量
+TEST_PROJECT = "e2e_test_project"
+
+
 @pytest.mark.e2e
 @pytest.mark.asyncio
 class TestMCPToolsReal:
@@ -44,7 +50,7 @@ class TestMCPToolsReal:
         # 导入测试代码
         from tests.e2e.test_helpers import import_code_safe
 
-        result = await import_code_safe(joern_server, str(sample_c_code), "mcp_test_project")
+        result = await import_code_safe(joern_server, str(sample_c_code), TEST_PROJECT)
         logger.info(f"Import result: {result}")
 
         yield
@@ -245,7 +251,8 @@ class TestQueryToolsReal:
         """测试 list_functions 工具"""
         from joern_mcp.tools.query import list_functions
 
-        result = await get_tool_fn(list_functions)()
+        # project_name 现在是必填参数
+        result = await get_tool_fn(list_functions)("query_tools_test")
 
         logger.info(f"list_functions result: {result}")
 
@@ -253,18 +260,34 @@ class TestQueryToolsReal:
         assert "success" in result, "缺少 success 字段"
         assert result["success"], f"列出函数失败: {result.get('error')}"
         assert "functions" in result, "缺少 functions 字段"
+        assert result.get("project") == "query_tools_test", "返回的项目名称不匹配"
 
     async def test_get_function_code(self):
         """测试 get_function_code 工具"""
         from joern_mcp.tools.query import get_function_code
 
-        result = await get_tool_fn(get_function_code)("main")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_function_code)("query_tools_test", "main")
 
         logger.info(f"get_function_code result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
         assert result["success"], f"获取函数代码失败: {result.get('error')}"
+        assert result.get("project") == "query_tools_test", "返回的项目名称不匹配"
+
+    async def test_search_code(self):
+        """测试 search_code 工具"""
+        from joern_mcp.tools.query import search_code
+
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(search_code)("query_tools_test", "main", scope="methods")
+
+        logger.info(f"search_code result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "query_tools_test", "返回的项目名称不匹配"
 
 
 @pytest.mark.e2e
@@ -289,34 +312,57 @@ class TestCallgraphToolsReal:
         """测试 get_callers 工具"""
         from joern_mcp.tools.callgraph import get_callers
 
-        result = await get_tool_fn(get_callers)("vulnerable_function")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_callers)("callgraph_tools_test", "vulnerable_function")
 
         logger.info(f"get_callers result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "callgraph_tools_test", "返回的项目名称不匹配"
 
     async def test_get_callees(self):
         """测试 get_callees 工具"""
         from joern_mcp.tools.callgraph import get_callees
 
-        result = await get_tool_fn(get_callees)("main")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_callees)("callgraph_tools_test", "main")
 
         logger.info(f"get_callees result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "callgraph_tools_test", "返回的项目名称不匹配"
 
     async def test_get_call_chain(self):
         """测试 get_call_chain 工具"""
         from joern_mcp.tools.callgraph import get_call_chain
 
-        result = await get_tool_fn(get_call_chain)("main", max_depth=3)
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_call_chain)("callgraph_tools_test", "main", max_depth=3)
 
         logger.info(f"get_call_chain result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "callgraph_tools_test", "返回的项目名称不匹配"
+
+    async def test_get_call_graph(self):
+        """测试 get_call_graph 工具"""
+        from joern_mcp.tools.callgraph import get_call_graph
+
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_call_graph)("callgraph_tools_test", "main", depth=1)
+
+        logger.info(f"get_call_graph result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "callgraph_tools_test", "返回的项目名称不匹配"
+        # 验证调用图结构
+        if result.get("success"):
+            assert "nodes" in result, "缺少 nodes 字段"
+            assert "edges" in result, "缺少 edges 字段"
 
 
 @pytest.mark.e2e
@@ -341,23 +387,40 @@ class TestDataflowToolsReal:
         """测试 track_dataflow 工具"""
         from joern_mcp.tools.dataflow import track_dataflow
 
-        result = await get_tool_fn(track_dataflow)("main", "argv")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(track_dataflow)("dataflow_tools_test", "gets", "strcpy")
 
         logger.info(f"track_dataflow result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "dataflow_tools_test", "返回的项目名称不匹配"
 
     async def test_find_data_dependencies(self):
         """测试 find_data_dependencies 工具"""
         from joern_mcp.tools.dataflow import find_data_dependencies
 
-        result = await get_tool_fn(find_data_dependencies)("buffer")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(find_data_dependencies)("dataflow_tools_test", "main")
 
         logger.info(f"find_data_dependencies result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "dataflow_tools_test", "返回的项目名称不匹配"
+
+    async def test_analyze_variable_flow(self):
+        """测试 analyze_variable_flow 工具"""
+        from joern_mcp.tools.dataflow import analyze_variable_flow
+
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(analyze_variable_flow)("dataflow_tools_test", "buffer")
+
+        logger.info(f"analyze_variable_flow result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "dataflow_tools_test", "返回的项目名称不匹配"
 
 
 @pytest.mark.e2e
@@ -382,23 +445,40 @@ class TestTaintToolsReal:
         """测试 find_vulnerabilities 工具"""
         from joern_mcp.tools.taint import find_vulnerabilities
 
-        result = await get_tool_fn(find_vulnerabilities)()
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(find_vulnerabilities)("taint_tools_test")
 
         logger.info(f"find_vulnerabilities result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "taint_tools_test", "返回的项目名称不匹配"
 
     async def test_check_taint_flow(self):
         """测试 check_taint_flow 工具"""
         from joern_mcp.tools.taint import check_taint_flow
 
-        result = await get_tool_fn(check_taint_flow)("argv", "strcpy")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(check_taint_flow)("taint_tools_test", "gets", "strcpy")
 
         logger.info(f"check_taint_flow result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "taint_tools_test", "返回的项目名称不匹配"
+
+    async def test_list_vulnerability_rules(self):
+        """测试 list_vulnerability_rules 工具"""
+        from joern_mcp.tools.taint import list_vulnerability_rules
+
+        result = await get_tool_fn(list_vulnerability_rules)()
+
+        logger.info(f"list_vulnerability_rules result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+        if result.get("success"):
+            assert "rules" in result, "缺少 rules 字段"
 
 
 @pytest.mark.e2e
@@ -423,23 +503,40 @@ class TestCFGToolsReal:
         """测试 get_control_flow_graph 工具"""
         from joern_mcp.tools.cfg import get_control_flow_graph
 
-        result = await get_tool_fn(get_control_flow_graph)("main")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_control_flow_graph)("cfg_tools_test", "main")
 
         logger.info(f"get_control_flow_graph result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "cfg_tools_test", "返回的项目名称不匹配"
 
     async def test_analyze_control_structures(self):
         """测试 analyze_control_structures 工具"""
         from joern_mcp.tools.cfg import analyze_control_structures
 
-        result = await get_tool_fn(analyze_control_structures)("main")
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(analyze_control_structures)("cfg_tools_test", "main")
 
         logger.info(f"analyze_control_structures result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "cfg_tools_test", "返回的项目名称不匹配"
+
+    async def test_get_dominators(self):
+        """测试 get_dominators 工具"""
+        from joern_mcp.tools.cfg import get_dominators
+
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(get_dominators)("cfg_tools_test", "main")
+
+        logger.info(f"get_dominators result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "cfg_tools_test", "返回的项目名称不匹配"
 
 
 @pytest.mark.e2e
@@ -464,13 +561,32 @@ class TestBatchToolsReal:
         """测试 batch_query 工具"""
         from joern_mcp.tools.batch import batch_query
 
-        queries = ["cpg.method.name.l", "cpg.call.name.l"]
+        # 查询需要指定项目前缀
+        queries = [
+            'workspace.project("batch_tools_test").get.cpg.get.method.name.l',
+            'workspace.project("batch_tools_test").get.cpg.get.call.name.l',
+        ]
         result = await get_tool_fn(batch_query)(queries)
 
         logger.info(f"batch_query result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
+        if result.get("success"):
+            assert "results" in result, "缺少 results 字段"
+
+    async def test_batch_function_analysis(self):
+        """测试 batch_function_analysis 工具"""
+        from joern_mcp.tools.batch import batch_function_analysis
+
+        # project_name 现在是第一个必填参数
+        result = await get_tool_fn(batch_function_analysis)("batch_tools_test", ["main"])
+
+        logger.info(f"batch_function_analysis result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+        assert result.get("project") == "batch_tools_test", "返回的项目名称不匹配"
 
 
 @pytest.mark.e2e
@@ -501,6 +617,25 @@ class TestExportToolsReal:
         )
 
         logger.info(f"export_cpg result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+
+    async def test_export_analysis_results(self, tmp_path):
+        """测试 export_analysis_results 工具"""
+        from joern_mcp.tools.export import export_analysis_results
+
+        output_path = str(tmp_path / "results.json")
+        test_data = {
+            "vulnerabilities": [
+                {"name": "test_vuln", "severity": "HIGH"}
+            ]
+        }
+        result = await get_tool_fn(export_analysis_results)(
+            test_data, output_path, format="json"
+        )
+
+        logger.info(f"export_analysis_results result: {result}")
 
         assert isinstance(result, dict), f"返回类型错误: {type(result)}"
         assert "success" in result, "缺少 success 字段"
@@ -536,3 +671,33 @@ class TestPerformanceToolsReal:
         # 验证有数据返回
         assert result is not None
 
+    async def test_clear_query_cache(self):
+        """测试 clear_query_cache 工具"""
+        from joern_mcp.tools.performance import clear_query_cache
+
+        result = await get_tool_fn(clear_query_cache)()
+
+        logger.info(f"clear_query_cache result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+        assert "success" in result, "缺少 success 字段"
+
+    async def test_get_cache_stats(self):
+        """测试 get_cache_stats 工具"""
+        from joern_mcp.tools.performance import get_cache_stats
+
+        result = await get_tool_fn(get_cache_stats)()
+
+        logger.info(f"get_cache_stats result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"
+
+    async def test_get_system_health(self):
+        """测试 get_system_health 工具"""
+        from joern_mcp.tools.performance import get_system_health
+
+        result = await get_tool_fn(get_system_health)()
+
+        logger.info(f"get_system_health result: {result}")
+
+        assert isinstance(result, dict), f"返回类型错误: {type(result)}"

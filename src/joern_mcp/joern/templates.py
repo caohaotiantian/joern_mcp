@@ -54,9 +54,12 @@ class QueryTemplates:
            ))
     """)
 
+    # GET_CALL_CHAIN 已废弃：repeat 语法在不同 Joern 版本差异较大
+    # 请使用 CallGraphService.get_call_chain() 替代，支持链式调用
     GET_CALL_CHAIN = Template("""
         cpg.method.name("$name")
-           .repeat(_.caller)(_.maxDepth($depth))
+           .caller
+           .caller
            .dedup
            .map(m => Map(
                "name" -> m.name,
@@ -192,13 +195,25 @@ class QueryTemplates:
     """)
 
     # ===== 代码搜索 =====
+    # 注意：cpg.all 不是有效的 Joern API，使用 call + identifier 组合替代
 
-    SEARCH_BY_PATTERN = Template("""
-        cpg.all.code(".*$pattern.*")
+    SEARCH_CALLS_BY_PATTERN = Template("""
+        cpg.call.code(".*$pattern.*")
            .take($limit)
            .map(n => Map(
                "code" -> n.code,
-               "type" -> n.label,
+               "type" -> "CALL",
+               "file" -> n.file.name.headOption.getOrElse("unknown"),
+               "line" -> n.lineNumber.getOrElse(-1)
+           ))
+    """)
+
+    SEARCH_IDENTIFIERS_BY_PATTERN = Template("""
+        cpg.identifier.name(".*$pattern.*")
+           .take($limit)
+           .map(n => Map(
+               "code" -> n.code,
+               "type" -> "IDENTIFIER",
                "file" -> n.file.name.headOption.getOrElse("unknown"),
                "line" -> n.lineNumber.getOrElse(-1)
            ))

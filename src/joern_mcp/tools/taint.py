@@ -6,7 +6,7 @@
 - list_vulnerability_rules: 列出检测规则
 - get_rule_details: 获取规则详情
 
-多项目支持：find_vulnerabilities 和 check_taint_flow 支持 project_name 参数。
+多项目支持：find_vulnerabilities 和 check_taint_flow 要求指定 project_name 参数。
 """
 
 from joern_mcp.mcp_server import mcp, server_state
@@ -15,25 +15,25 @@ from joern_mcp.services.taint import TaintAnalysisService
 
 @mcp.tool()
 async def find_vulnerabilities(
+    project_name: str,
     rule_name: str | None = None,
     severity: str | None = None,
     max_flows: int = 10,
-    project_name: str | None = None,
 ) -> dict:
     """
     查找代码中的安全漏洞
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         rule_name: 规则名称（可选，如"Command Injection", "SQL Injection"）
         severity: 严重程度过滤（可选：CRITICAL, HIGH, MEDIUM, LOW）
         max_flows: 每个规则的最大流数量（默认10，最大50）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 漏洞列表和统计信息
 
     Example:
-        >>> await find_vulnerabilities(severity="CRITICAL", project_name="webapp")
+        >>> await find_vulnerabilities("webapp", severity="CRITICAL")
         {
             "success": true,
             "project": "webapp",
@@ -61,25 +61,25 @@ async def find_vulnerabilities(
 
 @mcp.tool()
 async def check_taint_flow(
+    project_name: str,
     source_pattern: str,
     sink_pattern: str,
     max_flows: int = 10,
-    project_name: str | None = None,
 ) -> dict:
     """
     检查特定的污点流
 
     Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
         source_pattern: 源模式（正则表达式，如"gets|scanf"）
         sink_pattern: 汇模式（正则表达式，如"system|exec"）
         max_flows: 最大流数量（默认10，最大50）
-        project_name: 项目名称（可选，不指定则使用当前活动项目）
 
     Returns:
         dict: 污点流信息
 
     Example:
-        >>> await check_taint_flow("gets", "system", project_name="webapp")
+        >>> await check_taint_flow("webapp", "gets", "system")
         {
             "success": true,
             "project": "webapp",

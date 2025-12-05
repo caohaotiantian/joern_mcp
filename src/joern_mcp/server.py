@@ -23,11 +23,29 @@ async def health_check() -> dict:
     if not server_state.joern_server:
         return {"status": "unhealthy", "error": "Joern server not initialized"}
 
+    # 检查进程状态
+    process_running = server_state.joern_server.is_running()
+
+    # 执行健康检查查询
     is_healthy = await server_state.joern_server.health_check()
-    return {
+
+    result = {
         "status": "healthy" if is_healthy else "unhealthy",
         "joern_endpoint": server_state.joern_server.endpoint,
+        "process_running": process_running,
     }
+
+    if not is_healthy:
+        # 添加更多诊断信息
+        if not process_running:
+            result["error"] = "Joern server process is not running. It may have crashed or failed to start."
+        else:
+            result["error"] = (
+                "Joern server process is running but not responding. "
+                f"Check if WebSocket endpoint is available at ws://{server_state.joern_server.endpoint}/connect"
+            )
+
+    return result
 
 
 @mcp.tool()
