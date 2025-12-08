@@ -9,12 +9,16 @@ from joern_mcp.services.callgraph import CallGraphService
 
 @pytest.mark.asyncio
 async def test_get_callers():
-    """测试获取调用者"""
+    """测试获取调用者
+
+    注意：使用 .callIn 获取调用节点，而非 .caller 获取方法定义。
+    .callIn 返回调用点信息，包含文件名、行号、代码等。
+    """
     mock_executor = MagicMock()
     mock_executor.execute = AsyncMock(
         return_value={
             "success": True,
-            "stdout": '[{"name": "main", "filename": "main.c", "lineNumber": 10, "signature": "int()"}]',
+            "stdout": '[{"name": "main", "methodFullName": "main", "filename": "main.c", "lineNumber": 10, "signature": "int()", "code": "vulnerable_func()"}]',
         }
     )
 
@@ -31,21 +35,25 @@ async def test_get_callers():
     # 验证Mock被正确调用
     mock_executor.execute.assert_called_once()
 
-    # 验证查询参数
+    # 验证查询参数 - 使用 .callIn 而非 .caller
     call_args = mock_executor.execute.call_args[0][0]
     assert isinstance(call_args, str), "查询应该是字符串"
     assert "vulnerable_func" in call_args, "查询应该包含函数名"
-    assert "caller" in call_args, "查询应该获取调用者"
+    assert ".callIn" in call_args, "查询应该使用 .callIn 获取调用节点"
 
 
 @pytest.mark.asyncio
 async def test_get_callees():
-    """测试获取被调用者"""
+    """测试获取被调用者
+
+    注意：使用 .call 获取调用节点，而非 .callee 获取方法定义。
+    .call 返回调用点信息，包含文件名、行号、代码等。
+    """
     mock_executor = MagicMock()
     mock_executor.execute = AsyncMock(
         return_value={
             "success": True,
-            "stdout": '[{"name": "strcpy", "filename": "string.h", "lineNumber": 20, "signature": "char*()"}]',
+            "stdout": '[{"name": "strcpy", "methodFullName": "strcpy", "filename": "main.c", "lineNumber": 20, "signature": "char*()", "code": "strcpy(buf, input)"}]',
         }
     )
 
@@ -62,11 +70,11 @@ async def test_get_callees():
     # 验证Mock被正确调用
     mock_executor.execute.assert_called_once()
 
-    # 验证查询参数
+    # 验证查询参数 - 使用 .call 而非 .callee
     call_args = mock_executor.execute.call_args[0][0]
     assert isinstance(call_args, str), "查询应该是字符串"
     assert "main" in call_args, "查询应该包含函数名"
-    assert "callee" in call_args, "查询应该获取被调用者"
+    assert ".call" in call_args, "查询应该使用 .call 获取调用节点"
 
 
 @pytest.mark.asyncio

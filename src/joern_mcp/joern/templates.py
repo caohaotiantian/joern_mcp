@@ -32,26 +32,37 @@ class QueryTemplates:
 
     # ===== 调用关系查询 =====
 
+    # 使用 .callIn 获取调用节点，包含调用点的位置信息
+    # .caller 返回的是方法定义，缺少具体调用位置
     GET_CALLERS = Template("""
         cpg.method.name("$name")
-           .caller
-           .dedup
-           .map(m => Map(
-               "name" -> m.name,
-               "filename" -> m.filename,
-               "lineNumber" -> m.lineNumber.getOrElse(-1)
+           .callIn
+           .map(c => Map(
+               "name" -> c.method.name,
+               "methodFullName" -> c.method.fullName,
+               "signature" -> c.method.signature,
+               "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+               "lineNumber" -> c.lineNumber.getOrElse(-1),
+               "code" -> c.code
            ))
+           .dedup
     """)
 
+    # 使用 .call 获取调用节点，包含调用点的位置信息
+    # .callee 返回的是方法定义，外部库函数通常没有完整信息
     GET_CALLEES = Template("""
         cpg.method.name("$name")
-           .callee
-           .dedup
-           .map(m => Map(
-               "name" -> m.name,
-               "filename" -> m.filename,
-               "lineNumber" -> m.lineNumber.getOrElse(-1)
+           .call
+           .filterNot(_.name == "<operator>.*")
+           .map(c => Map(
+               "name" -> c.name,
+               "methodFullName" -> c.methodFullName,
+               "signature" -> c.signature,
+               "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+               "lineNumber" -> c.lineNumber.getOrElse(-1),
+               "code" -> c.code
            ))
+           .dedup
     """)
 
     # GET_CALL_CHAIN 已废弃：repeat 语法在不同 Joern 版本差异较大

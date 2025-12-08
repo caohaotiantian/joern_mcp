@@ -159,51 +159,64 @@ def get_function_query(function_name: str) -> str:
 def get_callers_query(function_name: str, depth: int = 1) -> str:
     """获取函数调用者
 
-    根据 Joern 文档 (https://docs.joern.io/cpgql/complex-steps/)
-    使用 .caller 链式调用获取调用者
+    使用 .callIn 获取调用节点，而非 .caller 获取方法定义。
+    .callIn 返回调用当前方法的 Call 节点，包含调用点的位置信息。
+    .caller 返回调用者的方法定义，但缺少具体调用位置。
+
+    参考: https://docs.joern.io/cpgql/calls/
 
     Args:
         function_name: 函数名称
-        depth: 调用深度（最大 5）
+        depth: 调用深度（保留参数，当前只支持1层）
 
     Returns:
         查询字符串
     """
-    depth = min(depth, 5)  # 限制最大深度
-    caller_chain = ".caller" * depth
+    # 注意：depth 参数保留但当前只支持单层调用
+    # 多层调用应通过递归方式实现
     return f'''cpg.method.name("{function_name}")
-           {caller_chain}
-           .dedup
-           .map(m => Map(
-               "name" -> m.name,
-               "filename" -> m.filename,
-               "lineNumber" -> m.lineNumber.getOrElse(-1)
-           ))'''
+           .callIn
+           .map(c => Map(
+               "name" -> c.method.name,
+               "methodFullName" -> c.method.fullName,
+               "signature" -> c.method.signature,
+               "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+               "lineNumber" -> c.lineNumber.getOrElse(-1),
+               "code" -> c.code
+           ))
+           .dedup'''
 
 
 def get_callees_query(function_name: str, depth: int = 1) -> str:
-    """获取函数被调用者
+    """获取函数调用的其他函数
 
-    根据 Joern 文档 (https://docs.joern.io/cpgql/complex-steps/)
-    使用 .callee 链式调用获取被调用者
+    使用 .call 获取调用节点，而非 .callee 获取方法定义。
+    .call 返回函数内的所有调用点，包含调用位置信息（文件名、行号、代码）。
+    .callee 返回被调用方法的定义，但外部库函数通常没有完整定义信息。
+
+    参考: https://docs.joern.io/cpgql/calls/
 
     Args:
         function_name: 函数名称
-        depth: 调用深度（最大 5）
+        depth: 调用深度（保留参数，当前只支持1层）
 
     Returns:
         查询字符串
     """
-    depth = min(depth, 5)  # 限制最大深度
-    callee_chain = ".callee" * depth
+    # 注意：depth 参数保留但当前只支持单层调用
+    # 多层调用应通过递归方式实现
     return f'''cpg.method.name("{function_name}")
-           {callee_chain}
-           .dedup
-           .map(m => Map(
-               "name" -> m.name,
-               "filename" -> m.filename,
-               "lineNumber" -> m.lineNumber.getOrElse(-1)
-           ))'''
+           .call
+           .filterNot(_.name == "<operator>.*")
+           .map(c => Map(
+               "name" -> c.name,
+               "methodFullName" -> c.methodFullName,
+               "signature" -> c.signature,
+               "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+               "lineNumber" -> c.lineNumber.getOrElse(-1),
+               "code" -> c.code
+           ))
+           .dedup'''
 
 
 def get_cfg_query(function_name: str) -> str:

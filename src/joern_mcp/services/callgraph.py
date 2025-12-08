@@ -38,7 +38,7 @@ class CallGraphService:
             project_name: 项目名称（可选）
 
         Returns:
-            dict: 调用者列表
+            dict: 调用者列表，包含调用点的位置信息
         """
         logger.info(f"Getting callers for function: {function_name} (project: {project_name or 'current'})")
 
@@ -48,39 +48,25 @@ class CallGraphService:
             if error:
                 return {"success": False, "error": error}
 
-            # 使用 .caller 方法获取调用者
-            # 根据 Joern 文档 (https://docs.joern.io/cpgql/complex-steps/)
-            # caller 是 Call Graph Step，直接可用
             depth = min(depth, 5)  # 限制最大深度
 
-            # 注意：.caller.caller 只返回第2层，我们需要收集所有层级
-            # 使用 flatMap 收集从第1层到第N层的所有调用者
-            if depth == 1:
-                query = f'''
-                {cpg_prefix}.method.name("{function_name}")
-                   .caller
-                   .dedup
-                   .map(m => Map(
-                       "name" -> m.name,
-                       "signature" -> m.signature,
-                       "filename" -> m.filename,
-                       "lineNumber" -> m.lineNumber.getOrElse(-1)
-                   ))
-                '''
-            else:
-                # 对于 depth > 1，使用 callIn 遍历获取所有层级的调用者
-                # callIn 返回调用该方法的 CALL 节点，然后获取其所在的 method
-                query = f'''
-                {cpg_prefix}.method.name("{function_name}")
-                   .caller
-                   .dedup
-                   .map(m => Map(
-                       "name" -> m.name,
-                       "signature" -> m.signature,
-                       "filename" -> m.filename,
-                       "lineNumber" -> m.lineNumber.getOrElse(-1)
-                   ))
-                '''
+            # 使用 .callIn 获取调用节点（Call），而非 .caller 获取方法定义
+            # .callIn 返回调用当前方法的 Call 节点，包含调用点的位置信息
+            # .caller 返回调用者的方法定义，但缺少具体调用位置
+            # 参考: https://docs.joern.io/cpgql/calls/
+            query = f'''
+            {cpg_prefix}.method.name("{function_name}")
+               .callIn
+               .map(c => Map(
+                   "name" -> c.method.name,
+                   "methodFullName" -> c.method.fullName,
+                   "signature" -> c.method.signature,
+                   "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+                   "lineNumber" -> c.lineNumber.getOrElse(-1),
+                   "code" -> c.code
+               ))
+               .dedup
+            '''
 
             result = await self.executor.execute(query)
 
@@ -120,7 +106,7 @@ class CallGraphService:
             project_name: 项目名称（可选）
 
         Returns:
-            dict: 被调用函数列表
+            dict: 被调用函数列表，包含调用点的位置信息
         """
         logger.info(f"Getting callees for function: {function_name} (project: {project_name or 'current'})")
 
@@ -130,23 +116,25 @@ class CallGraphService:
             if error:
                 return {"success": False, "error": error}
 
-            # 使用 .callee 方法获取被调用者
-            # 根据 Joern 文档 (https://docs.joern.io/cpgql/complex-steps/)
-            # callee 是 Call Graph Step，直接可用
             depth = min(depth, 5)  # 限制最大深度
 
-            # 始终使用 .callee 获取直接被调用者（一层）
-            # 多层调用关系应该通过 get_call_graph 的递归收集来实现
+            # 使用 .call 获取调用节点，而非 .callee 获取方法定义
+            # .call 返回函数内的所有调用节点（Call），包含调用点的位置信息
+            # .callee 返回被调用方法的定义（Method），外部库函数通常没有完整定义
+            # 参考: https://docs.joern.io/cpgql/calls/
             query = f'''
             {cpg_prefix}.method.name("{function_name}")
-               .callee
-               .dedup
-               .map(m => Map(
-                   "name" -> m.name,
-                   "signature" -> m.signature,
-                   "filename" -> m.filename,
-                   "lineNumber" -> m.lineNumber.getOrElse(-1)
+               .call
+               .filterNot(_.name == "<operator>.*")
+               .map(c => Map(
+                   "name" -> c.name,
+                   "methodFullName" -> c.methodFullName,
+                   "signature" -> c.signature,
+                   "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+                   "lineNumber" -> c.lineNumber.getOrElse(-1),
+                   "code" -> c.code
                ))
+               .dedup
             '''
 
             result = await self.executor.execute(query)
@@ -208,19 +196,32 @@ class CallGraphService:
             # 限制深度并构建查询
             max_depth = min(max_depth, 5)
 
-            # 始终使用单层调用关系
-            # 多层调用链通过递归收集实现
-            step = ".caller" if direction == "up" else ".callee"
-
-            query = f'''
-            {cpg_prefix}.method.name("{function_name}")
-               {step}
-               .dedup
-               .map(m => Map(
-                   "name" -> m.name,
-                   "filename" -> m.filename
-               ))
-            '''
+            # 向上追溯使用 .callIn（获取调用节点，包含位置信息）
+            # 向下追溯使用 .call（获取调用节点，包含位置信息）
+            if direction == "up":
+                query = f'''
+                {cpg_prefix}.method.name("{function_name}")
+                   .callIn
+                   .map(c => Map(
+                       "name" -> c.method.name,
+                       "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+                       "lineNumber" -> c.lineNumber.getOrElse(-1)
+                   ))
+                   .dedup
+                '''
+            else:
+                # 向下追溯使用 .call 获取调用点信息
+                query = f'''
+                {cpg_prefix}.method.name("{function_name}")
+                   .call
+                   .filterNot(_.name == "<operator>.*")
+                   .map(c => Map(
+                       "name" -> c.name,
+                       "filename" -> c.file.name.headOption.getOrElse("<unknown>"),
+                       "lineNumber" -> c.lineNumber.getOrElse(-1)
+                   ))
+                   .dedup
+                '''
 
             result = await self.executor.execute(query)
 
@@ -344,19 +345,24 @@ class CallGraphService:
             if isinstance(caller, dict):
                 caller_name = caller.get("name", "unknown")
 
-                # 添加节点
+                # 添加节点（包含完整的调用信息）
                 graph["nodes"].append({
                     "id": caller_name,
                     "type": "caller",
+                    "methodFullName": caller.get("methodFullName", ""),
+                    "signature": caller.get("signature", ""),
                     "filename": caller.get("filename", ""),
                     "lineNumber": caller.get("lineNumber", -1),
+                    "code": caller.get("code", ""),
                 })
 
-                # 添加边
+                # 添加边（包含调用位置信息）
                 graph["edges"].append({
                     "from": caller_name,
                     "to": function_name,
                     "type": "calls",
+                    "lineNumber": caller.get("lineNumber", -1),
+                    "code": caller.get("code", ""),
                 })
 
                 # 递归收集更上层的调用者
@@ -388,19 +394,24 @@ class CallGraphService:
             if isinstance(callee, dict):
                 callee_name = callee.get("name", "unknown")
 
-                # 添加节点
+                # 添加节点（包含完整的调用信息）
                 graph["nodes"].append({
                     "id": callee_name,
                     "type": "callee",
+                    "methodFullName": callee.get("methodFullName", ""),
+                    "signature": callee.get("signature", ""),
                     "filename": callee.get("filename", ""),
                     "lineNumber": callee.get("lineNumber", -1),
+                    "code": callee.get("code", ""),
                 })
 
-                # 添加边
+                # 添加边（包含调用位置信息）
                 graph["edges"].append({
                     "from": function_name,
                     "to": callee_name,
                     "type": "calls",
+                    "lineNumber": callee.get("lineNumber", -1),
+                    "code": callee.get("code", ""),
                 })
 
                 # 递归收集更下层的被调用者
