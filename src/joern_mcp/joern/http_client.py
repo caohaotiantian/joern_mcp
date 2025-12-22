@@ -23,7 +23,7 @@ import websockets
 from loguru import logger
 
 # ANSI 颜色控制码正则表达式
-_ANSI_ESCAPE_PATTERN = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+_ANSI_ESCAPE_PATTERN = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -36,7 +36,8 @@ def strip_ansi_codes(text: str) -> str:
     Returns:
         清理后的纯文本
     """
-    return _ANSI_ESCAPE_PATTERN.sub('', text)
+    return _ANSI_ESCAPE_PATTERN.sub("", text)
+
 
 # 全局信号量：限制并发WebSocket连接数，避免资源竞争
 _connection_semaphore: asyncio.Semaphore | None = None
@@ -95,7 +96,9 @@ class JoernHTTPClient:
         """GET结果端点"""
         return f"http://{self.endpoint}/result/{uuid}"
 
-    async def execute(self, query: str, use_sync_endpoint: bool = False) -> dict[str, Any]:
+    async def execute(
+        self, query: str, use_sync_endpoint: bool = False
+    ) -> dict[str, Any]:
         """
         执行CPGQL查询
 
@@ -122,7 +125,9 @@ class JoernHTTPClient:
 
             # 如果 WebSocket 连接失败（404），尝试同步模式
             if not result.get("success") and "HTTP 404" in result.get("stderr", ""):
-                logger.warning("WebSocket endpoint not available, falling back to sync endpoint")
+                logger.warning(
+                    "WebSocket endpoint not available, falling back to sync endpoint"
+                )
                 return await self._execute_sync(query)
 
             return result
@@ -191,7 +196,9 @@ class JoernHTTPClient:
             connect_endpoint = self._connect_endpoint()
             logger.debug(f"连接WebSocket: {connect_endpoint}")
 
-            async with websockets.connect(connect_endpoint, ping_interval=None) as ws_conn:
+            async with websockets.connect(
+                connect_endpoint, ping_interval=None
+            ) as ws_conn:
                 logger.debug("WebSocket连接成功，等待确认消息...")
                 # 等待连接确认消息
                 connected_msg = await ws_conn.recv()
@@ -228,7 +235,9 @@ class JoernHTTPClient:
                 logger.debug(f"查询已提交，UUID: {query_uuid}")
 
                 # 3. 等待WebSocket完成通知（必须等到我们提交的查询完成）
-                logger.debug(f"等待查询 {query_uuid} 的完成通知（超时: {self.timeout}s）...")
+                logger.debug(
+                    f"等待查询 {query_uuid} 的完成通知（超时: {self.timeout}s）..."
+                )
 
                 # 循环等待，直到收到我们查询的UUID
                 start_time = time.time()
@@ -238,8 +247,7 @@ class JoernHTTPClient:
                         raise asyncio.TimeoutError(f"等待查询 {query_uuid} 完成超时")
 
                     completion_msg = await asyncio.wait_for(
-                        ws_conn.recv(),
-                        timeout=remaining_timeout
+                        ws_conn.recv(), timeout=remaining_timeout
                     )
                     logger.debug(f"收到完成通知: {completion_msg}")
 
@@ -249,7 +257,9 @@ class JoernHTTPClient:
                         break
                     else:
                         # 收到其他查询的通知，继续等待
-                        logger.debug(f"收到其他查询的通知 {completion_msg}，继续等待 {query_uuid}")
+                        logger.debug(
+                            f"收到其他查询的通知 {completion_msg}，继续等待 {query_uuid}"
+                        )
 
                 # 4. GET查询结果（同步requests）
                 result_endpoint = self._get_result_endpoint(query_uuid)
@@ -341,4 +351,3 @@ class JoernHTTPClient:
 
     def __repr__(self) -> str:
         return f"JoernHTTPClient(endpoint={self.endpoint})"
-

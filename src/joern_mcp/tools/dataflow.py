@@ -49,7 +49,9 @@ async def track_dataflow(
         return {"success": False, "error": "Max flows must be between 1 and 50"}
 
     service = DataFlowService(server_state.query_executor)
-    return await service.track_dataflow(source_method, sink_method, max_flows, project_name)
+    return await service.track_dataflow(
+        source_method, sink_method, max_flows, project_name
+    )
 
 
 @mcp.tool()
@@ -88,7 +90,9 @@ async def analyze_variable_flow(
         return {"success": False, "error": "Max flows must be between 1 and 50"}
 
     service = DataFlowService(server_state.query_executor)
-    return await service.analyze_variable_flow(variable_name, sink_method, max_flows, project_name)
+    return await service.analyze_variable_flow(
+        variable_name, sink_method, max_flows, project_name
+    )
 
 
 @mcp.tool()
@@ -123,4 +127,6 @@ async def find_data_dependencies(
         return {"success": False, "error": "Query executor not initialized"}
 
     service = DataFlowService(server_state.query_executor)
-    return await service.find_data_dependencies(function_name, variable_name, project_name)
+    return await service.find_data_dependencies(
+        function_name, variable_name, project_name
+    )

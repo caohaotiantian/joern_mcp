@@ -77,6 +77,7 @@ class TestQueryToolsE2E:
 
         # 解析函数列表
         import json
+
         if isinstance(stdout, list):
             functions = stdout
         elif isinstance(stdout, str):
@@ -85,20 +86,23 @@ class TestQueryToolsE2E:
                 functions = json.loads(stdout) if stdout else []
             except json.JSONDecodeError:
                 # 可能是逗号分隔的字符串
-                functions = [f.strip() for f in stdout.split(',') if f.strip()]
+                functions = [f.strip() for f in stdout.split(",") if f.strip()]
         else:
             functions = []
 
         # 验证函数列表结构
-        assert isinstance(functions, list), f"函数列表应该是list，实际: {type(functions)}"
+        assert isinstance(functions, list), (
+            f"函数列表应该是list，实际: {type(functions)}"
+        )
 
         # 验证包含预期的函数（基于sample_c代码）
         expected_functions = ["main", "unsafe_strcpy", "process_input"]
         function_names = [f if isinstance(f, str) else str(f) for f in functions]
 
         for expected in expected_functions:
-            assert any(expected in fname for fname in function_names), \
+            assert any(expected in fname for fname in function_names), (
                 f"函数列表应该包含{expected}，实际: {function_names}"
+            )
 
 
 @pytest.mark.e2e

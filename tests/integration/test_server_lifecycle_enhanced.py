@@ -1,6 +1,5 @@
 """增强的服务器生命周期测试 - 提升覆盖率"""
 
-
 import pytest
 from loguru import logger
 
@@ -38,8 +37,9 @@ class TestServerLifecycleEnhanced:
             await executor.execute("cpg.method.name.l", timeout=0.001)
 
         # 验证错误消息包含"timeout"
-        assert "timeout" in str(exc_info.value).lower(), \
+        assert "timeout" in str(exc_info.value).lower(), (
             f"错误消息应包含timeout，实际: {exc_info.value}"
+        )
 
     @pytest.mark.asyncio
     async def test_cache_functionality(self, joern_server):
@@ -91,7 +91,9 @@ class TestServerLifecycleEnhanced:
         assert "cache_hit_rate" in perf_stats, "应该有缓存命中率"
 
         # 验证统计值合理
-        assert perf_stats["total_queries"] >= 3, f"总查询数应该>=3，实际{perf_stats['total_queries']}"
+        assert perf_stats["total_queries"] >= 3, (
+            f"总查询数应该>=3，实际{perf_stats['total_queries']}"
+        )
         assert perf_stats["avg_time"] >= 0, "平均时间应该非负"
 
     @pytest.mark.asyncio
@@ -149,16 +151,18 @@ class TestServerLifecycleEnhanced:
                     await executor.execute(query)
 
                 # 验证错误消息包含"Forbidden"
-                assert "Forbidden" in str(exc_info.value), \
+                assert "Forbidden" in str(exc_info.value), (
                     f"模式{pattern_name}: 错误消息应该包含Forbidden，实际: {exc_info.value}"
+                )
                 blocked_count += 1
             except Exception as e:
                 # 如果查询本身有其他问题，记录并继续
                 logger.warning(f"模式{pattern_name}测试失败: {e}")
 
         # 大部分危险操作应该被阻止
-        assert blocked_count >= len(dangerous_patterns) // 2, \
+        assert blocked_count >= len(dangerous_patterns) // 2, (
             "应该阻止至少一半的危险操作"
+        )
 
         # 验证搜索查询（引号内的模式）被允许
         search_query = 'cpg.typeDecl.name("ProcessBuilder").l'
@@ -225,10 +229,10 @@ class TestServerLifecycleEnhanced:
         stderr = str(result.get("stderr", ""))
 
         # 至少应该返回了某种结果（成功或失败）
-        assert "success" in result or "stdout" in result or "stderr" in result, \
+        assert "success" in result or "stdout" in result or "stderr" in result, (
             "应该包含success、stdout或stderr字段"
+        )
 
         # 如果有输出，记录日志（用于调试）
         if stdout or stderr:
             logger.info(f"查询输出: stdout长度={len(stdout)}, stderr长度={len(stderr)}")
-

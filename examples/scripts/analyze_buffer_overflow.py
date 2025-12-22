@@ -30,7 +30,9 @@ DANGEROUS_FUNCTIONS = [
 ]
 
 
-async def analyze_buffer_overflow(source_path: str, project_name: str = "buffer_overflow_scan"):
+async def analyze_buffer_overflow(
+    source_path: str, project_name: str = "buffer_overflow_scan"
+):
     """
     分析代码中的缓冲区溢出漏洞
 
@@ -100,8 +102,8 @@ async def analyze_buffer_overflow(source_path: str, project_name: str = "buffer_
                 import re
 
                 # 清理输出
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+                ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+                clean_output = ansi_escape.sub("", stdout).strip()
 
                 try:
                     calls = json.loads(clean_output)
@@ -109,7 +111,7 @@ async def analyze_buffer_overflow(source_path: str, project_name: str = "buffer_
                         calls = json.loads(calls)
 
                     if calls:
-                        for call in (calls if isinstance(calls, list) else [calls]):
+                        for call in calls if isinstance(calls, list) else [calls]:
                             call["recommendation"] = recommendation
                             dangerous_calls.append(call)
                 except json.JSONDecodeError:
@@ -133,8 +135,12 @@ async def analyze_buffer_overflow(source_path: str, project_name: str = "buffer_
                     source = vuln.get("source", {})
                     sink = vuln.get("sink", {})
 
-                    print(f"  源: {source.get('code', 'N/A')} ({source.get('file', 'unknown')}:{source.get('line', -1)})")
-                    print(f"  汇: {sink.get('code', 'N/A')} ({sink.get('file', 'unknown')}:{sink.get('line', -1)})")
+                    print(
+                        f"  源: {source.get('code', 'N/A')} ({source.get('file', 'unknown')}:{source.get('line', -1)})"
+                    )
+                    print(
+                        f"  汇: {sink.get('code', 'N/A')} ({sink.get('file', 'unknown')}:{sink.get('line', -1)})"
+                    )
 
             # 输出危险函数调用
             if dangerous_calls:
@@ -145,7 +151,9 @@ async def analyze_buffer_overflow(source_path: str, project_name: str = "buffer_
                     print(f"\n问题 #{i}")
                     print(f"  函数: {call.get('function', 'unknown')}")
                     print(f"  代码: {call.get('code', 'N/A')}")
-                    print(f"  位置: {call.get('file', 'unknown')}:{call.get('line', -1)}")
+                    print(
+                        f"  位置: {call.get('file', 'unknown')}:{call.get('line', -1)}"
+                    )
                     print(f"  所在方法: {call.get('method', 'unknown')}")
                     print(f"  💡 建议: {call.get('recommendation', 'N/A')}")
 
@@ -162,6 +170,7 @@ async def analyze_buffer_overflow(source_path: str, project_name: str = "buffer_
     except Exception as e:
         print(f"\n❌ 发生错误: {e}")
         import traceback
+
         traceback.print_exc()
 
     finally:
@@ -192,4 +201,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

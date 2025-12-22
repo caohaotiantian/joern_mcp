@@ -96,7 +96,9 @@ class TestTaintAnalysisServiceExtended:
             return_value={"success": True, "stdout": json.dumps(vuln_data)}
         )
 
-        result = await service.analyze_with_rule(rule, max_flows=15, project_name="test")
+        result = await service.analyze_with_rule(
+            rule, max_flows=15, project_name="test"
+        )
         assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -112,5 +114,7 @@ class TestTaintAnalysisServiceExtended:
 
         # 测试每个规则都可以使用
         for rule in VULNERABILITY_RULES:
-            result = await service.analyze_with_rule(rule, max_flows=5, project_name="test")
+            result = await service.analyze_with_rule(
+                rule, max_flows=5, project_name="test"
+            )
             assert result["success"] is True

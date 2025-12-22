@@ -89,7 +89,9 @@ async def test_get_call_chain():
     )
 
     service = CallGraphService(mock_executor)
-    result = await service.get_call_chain("target_func", max_depth=5, direction="up", project_name="test")
+    result = await service.get_call_chain(
+        "target_func", max_depth=5, direction="up", project_name="test"
+    )
 
     assert result["success"] is True
     assert result["function"] == "target_func"

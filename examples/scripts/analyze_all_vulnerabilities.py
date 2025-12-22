@@ -95,14 +95,16 @@ async def comprehensive_scan(source_path: str, project_name: str = "security_sca
             for vuln in vulns:
                 vuln_type = vuln.get("vulnerability", "Unknown")
                 stats["by_type"][vuln_type] = stats["by_type"].get(vuln_type, 0) + 1
-                all_findings.append({
-                    "category": "污点分析",
-                    "type": vuln_type,
-                    "severity": vuln.get("severity", "UNKNOWN"),
-                    "cwe_id": vuln.get("cwe_id", "N/A"),
-                    "source": vuln.get("source", {}),
-                    "sink": vuln.get("sink", {}),
-                })
+                all_findings.append(
+                    {
+                        "category": "污点分析",
+                        "type": vuln_type,
+                        "severity": vuln.get("severity", "UNKNOWN"),
+                        "cwe_id": vuln.get("cwe_id", "N/A"),
+                        "source": vuln.get("source", {}),
+                        "sink": vuln.get("sink", {}),
+                    }
+                )
 
         # 2. 检查危险函数
         print("\n" + "-" * 70)
@@ -134,8 +136,9 @@ async def comprehensive_scan(source_path: str, project_name: str = "security_sca
             if result.get("success"):
                 stdout = result.get("stdout", "")
                 import re
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean_output = ansi_escape.sub('', stdout).strip()
+
+                ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+                clean_output = ansi_escape.sub("", stdout).strip()
 
                 try:
                     calls = json.loads(clean_output)
@@ -147,17 +150,19 @@ async def comprehensive_scan(source_path: str, project_name: str = "security_sca
                         stats["dangerous_functions"] += len(call_list)
 
                         for call in call_list:
-                            all_findings.append({
-                                "category": "危险函数",
-                                "type": f"使用 {func_name}",
-                                "severity": severity,
-                                "cwe_id": cwe,
-                                "location": {
-                                    "file": call.get("file", "unknown"),
-                                    "line": call.get("line", -1),
-                                    "code": call.get("code", "N/A"),
-                                },
-                            })
+                            all_findings.append(
+                                {
+                                    "category": "危险函数",
+                                    "type": f"使用 {func_name}",
+                                    "severity": severity,
+                                    "cwe_id": cwe,
+                                    "location": {
+                                        "file": call.get("file", "unknown"),
+                                        "line": call.get("line", -1),
+                                        "code": call.get("code", "N/A"),
+                                    },
+                                }
+                            )
                 except json.JSONDecodeError:
                     pass
 
@@ -199,7 +204,9 @@ async def comprehensive_scan(source_path: str, project_name: str = "security_sca
 
         if stats["by_type"]:
             print("\n📌 按漏洞类型分类:")
-            for vuln_type, count in sorted(stats["by_type"].items(), key=lambda x: -x[1]):
+            for vuln_type, count in sorted(
+                stats["by_type"].items(), key=lambda x: -x[1]
+            ):
                 print(f"   - {vuln_type}: {count}")
 
         # 输出详细发现
@@ -209,25 +216,47 @@ async def comprehensive_scan(source_path: str, project_name: str = "security_sca
             print("=" * 70)
 
             # 按严重程度排序
-            severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
-            sorted_findings = sorted(all_findings, key=lambda x: severity_order.get(x.get("severity", "UNKNOWN"), 4))
+            severity_order = {
+                "CRITICAL": 0,
+                "HIGH": 1,
+                "MEDIUM": 2,
+                "LOW": 3,
+                "UNKNOWN": 4,
+            }
+            sorted_findings = sorted(
+                all_findings,
+                key=lambda x: severity_order.get(x.get("severity", "UNKNOWN"), 4),
+            )
 
             for _i, finding in enumerate(sorted_findings[:20], 1):  # 只显示前 20 个
                 severity = finding.get("severity", "UNKNOWN")
-                severity_icon = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🟢"}.get(severity, "⚪")
+                severity_icon = {
+                    "CRITICAL": "🔴",
+                    "HIGH": "🟠",
+                    "MEDIUM": "🟡",
+                    "LOW": "🟢",
+                }.get(severity, "⚪")
 
-                print(f"\n{severity_icon} [{severity}] {finding.get('type', 'Unknown')}")
+                print(
+                    f"\n{severity_icon} [{severity}] {finding.get('type', 'Unknown')}"
+                )
                 print(f"   分类: {finding.get('category', 'N/A')}")
                 print(f"   CWE: {finding.get('cwe_id', 'N/A')}")
 
                 if "source" in finding and "sink" in finding:
                     source = finding["source"]
                     sink = finding["sink"]
-                    print(f"   源: {source.get('code', 'N/A')} ({source.get('file', 'unknown')}:{source.get('line', -1)})")
-                    print(f"   汇: {sink.get('code', 'N/A')} ({sink.get('file', 'unknown')}:{sink.get('line', -1)})")
+                    print(
+                        f"   源: {source.get('code', 'N/A')} ({source.get('file', 'unknown')}:{source.get('line', -1)})"
+                    )
+                    print(
+                        f"   汇: {sink.get('code', 'N/A')} ({sink.get('file', 'unknown')}:{sink.get('line', -1)})"
+                    )
                 elif "location" in finding:
                     loc = finding["location"]
-                    print(f"   位置: {loc.get('file', 'unknown')}:{loc.get('line', -1)}")
+                    print(
+                        f"   位置: {loc.get('file', 'unknown')}:{loc.get('line', -1)}"
+                    )
                     print(f"   代码: {loc.get('code', 'N/A')}")
 
             if len(all_findings) > 20:
@@ -261,6 +290,7 @@ async def comprehensive_scan(source_path: str, project_name: str = "security_sca
     except Exception as e:
         print(f"\n❌ 发生错误: {e}")
         import traceback
+
         traceback.print_exc()
 
     finally:
@@ -301,4 +331,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

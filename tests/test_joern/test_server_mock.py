@@ -163,7 +163,11 @@ class TestJoernServerManagerMock:
             # Mock client with async execute
             mock_client = MagicMock()
             mock_client.execute = AsyncMock(
-                return_value={"success": True, "stdout": '["async_result"]', "stderr": ""}
+                return_value={
+                    "success": True,
+                    "stdout": '["async_result"]',
+                    "stderr": "",
+                }
             )
             manager.client = mock_client
 

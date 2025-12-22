@@ -401,7 +401,7 @@ await batch_function_analysis({functions})
 # 批量执行查询
 # 示例：查询特定函数的代码
 queries = [
-    'cpg.method.name("<function_name>").code.l'
+    'cpg.method.name("<function_name>").code'
 ]
 await batch_query(queries)
 ```

@@ -40,16 +40,17 @@ class TestErrorScenarios:
             result = await executor.execute(query)
 
             # 应该返回结果，而不是抛出异常
-            assert isinstance(result, dict), \
+            assert isinstance(result, dict), (
                 f"查询'{query}'应返回dict，实际: {type(result)}"
+            )
 
             # Joern对语法错误可能返回success=True，但错误信息在stdout/stderr中
             # 检查是否有错误指示（success=False 或 stdout/stderr包含错误信息）
             (
-                result.get("success") is False or
-                "error" in str(result.get("stdout", "")).lower() or
-                "syntax error" in str(result.get("stdout", "")).lower() or
-                len(result.get("stderr", "")) > 0
+                result.get("success") is False
+                or "error" in str(result.get("stdout", "")).lower()
+                or "syntax error" in str(result.get("stdout", "")).lower()
+                or len(result.get("stderr", "")) > 0
             )
             # 对于明显错误的查询，至少应该有某种指示
             # 但Joern可能接受一些"看起来错误"的查询，所以这里只做宽松检查
@@ -81,16 +82,18 @@ class TestErrorScenarios:
 
                 # 验证错误消息
                 error_msg = str(exc_info.value)
-                assert "Forbidden" in error_msg, \
+                assert "Forbidden" in error_msg, (
                     f"模式{pattern}: 错误消息应包含'Forbidden'，实际: {error_msg}"
+                )
                 blocked_count += 1
             except Exception as e:
                 # 如果某个特定查询有问题，记录但继续
                 logger.warning(f"模式{pattern}测试失败: {e}")
 
         # 所有直接执行的危险操作都应该被阻止
-        assert blocked_count >= len(truly_dangerous_queries) // 2, \
-            f"应该阻止至少{len(truly_dangerous_queries)//2}个危险操作，实际阻止: {blocked_count}"
+        assert blocked_count >= len(truly_dangerous_queries) // 2, (
+            f"应该阻止至少{len(truly_dangerous_queries) // 2}个危险操作，实际阻止: {blocked_count}"
+        )
 
         # 引号内的搜索模式应该被允许（用于查找代码中的漏洞）
         safe_search_queries = [
@@ -148,13 +151,15 @@ class TestErrorScenarios:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 所有查询都应该返回结果（成功或错误）
-        assert len(results) == len(queries), \
+        assert len(results) == len(queries), (
             f"应该有{len(queries)}个结果，实际: {len(results)}"
+        )
 
         # 每个结果都应该是dict或异常
         for i, result in enumerate(results):
-            assert isinstance(result, (dict, Exception)), \
+            assert isinstance(result, (dict, Exception)), (
                 f"查询{i}结果类型错误: {type(result)}"
+            )
 
             # 如果是dict，应该有必要的字段
             if isinstance(result, dict):
@@ -168,7 +173,7 @@ class TestErrorScenarios:
         # 包含各种特殊字符的查询
         special_queries = [
             'cpg.method.name("test\'quote").l',  # 单引号
-            'cpg.method.name("test\"doublequote").l',  # 双引号
+            'cpg.method.name("test"doublequote").l',  # 双引号
             'cpg.method.name("test\\backslash").l',  # 反斜杠
             'cpg.method.name("test\nNewline").l',  # 换行符
             'cpg.method.name("test\ttab").l',  # 制表符
@@ -178,8 +183,7 @@ class TestErrorScenarios:
             result = await executor.execute(query)
 
             # 应该正确处理（成功或失败都可以）
-            assert isinstance(result, dict), \
-                f"特殊字符查询应返回dict: {query}"
+            assert isinstance(result, dict), f"特殊字符查询应返回dict: {query}"
 
     @pytest.mark.asyncio
     async def test_very_long_query_handling(self, joern_server):
@@ -220,7 +224,7 @@ class TestErrorScenarios:
         # 连续执行多个错误查询
         for _i in range(5):
             result = await executor.execute("invalid query syntax")
-            assert isinstance(result, dict), f"第{_i+1}个错误查询应返回dict"
+            assert isinstance(result, dict), f"第{_i + 1}个错误查询应返回dict"
 
     @pytest.mark.asyncio
     async def test_error_with_unicode(self, joern_server):
@@ -236,8 +240,7 @@ class TestErrorScenarios:
 
         for query in unicode_invalid_queries:
             result = await executor.execute(query)
-            assert isinstance(result, dict), \
-                f"Unicode错误查询应返回dict: {query}"
+            assert isinstance(result, dict), f"Unicode错误查询应返回dict: {query}"
 
     @pytest.mark.asyncio
     async def test_mixed_valid_invalid_sequential(self, joern_server):
@@ -266,9 +269,9 @@ class TestErrorScenarios:
             else:
                 # 无效查询应该有错误指示
                 (
-                    result.get("success") is False or
-                    "error" in result or
-                    "stderr" in result
+                    result.get("success") is False
+                    or "error" in result
+                    or "stderr" in result
                 )
                 # 注意：有些"无效"查询可能被Joern接受，所以这里不强制断言
 
@@ -284,4 +287,3 @@ class TestErrorScenarios:
 
         # 应该能处理（可能返回错误）
         assert isinstance(result, dict), "包含null字节的查询应返回dict"
-

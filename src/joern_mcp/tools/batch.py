@@ -30,8 +30,8 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
 
     Example:
         >>> await batch_query([
-        ...     'workspace.project("myproject").get.cpg.get.method.name.l',
-        ...     'workspace.project("myproject").get.cpg.get.call.name.l'
+        ...     'workspace.project("myproject").get.cpg.get.method.name',
+        ...     'workspace.project("myproject").get.cpg.get.call.name'
         ... ])
         {
             "success": true,
@@ -42,8 +42,9 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
         }
 
     Note:
-        查询使用原始 Scala 语法。必须在查询中指定项目：
-        workspace.project("name").get.cpg.get.method.name.l
+        查询使用原始 Scala 语法，返回 JSON 格式。
+        必须在查询中指定项目：workspace.project("name").get.cpg.get.method.name
+        避免使用 .l 以防止输出截断（默认截断为 1000 字符）
     """
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
@@ -105,9 +106,7 @@ async def batch_query(queries: list[str], timeout: int = 300) -> dict:
 
 
 @mcp.tool()
-async def batch_function_analysis(
-    project_name: str, function_names: list[str]
-) -> dict:
+async def batch_function_analysis(project_name: str, function_names: list[str]) -> dict:
     """
     批量分析多个函数
 
@@ -137,11 +136,15 @@ async def batch_function_analysis(
     if len(function_names) > 10:
         return {"success": False, "error": "Maximum 10 functions allowed in batch"}
 
-    logger.info(f"Batch analyzing {len(function_names)} functions (project: {project_name})")
+    logger.info(
+        f"Batch analyzing {len(function_names)} functions (project: {project_name})"
+    )
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 
@@ -179,7 +182,10 @@ async def batch_function_analysis(
                         analyses[func_name] = None
                 except (ValueError, Exception) as e:
                     # 解析失败，保留错误上下文
-                    analyses[func_name] = {"error": f"Failed to parse result: {e}", "raw_output": stdout[:200]}
+                    analyses[func_name] = {
+                        "error": f"Failed to parse result: {e}",
+                        "raw_output": stdout[:200],
+                    }
             else:
                 analyses[func_name] = {"error": result.get("stderr", "Query failed")}
 

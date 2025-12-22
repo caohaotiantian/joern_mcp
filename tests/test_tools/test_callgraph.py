@@ -22,8 +22,18 @@ class TestCallGraphTools:
 
         # Mock查询结果 - 返回JSON格式的stdout
         callers_data = [
-            {"name": "caller1", "filename": "test.c", "signature": "void()", "lineNumber": 10},
-            {"name": "caller2", "filename": "test.c", "signature": "int()", "lineNumber": 20},
+            {
+                "name": "caller1",
+                "filename": "test.c",
+                "signature": "void()",
+                "lineNumber": 10,
+            },
+            {
+                "name": "caller2",
+                "filename": "test.c",
+                "signature": "int()",
+                "lineNumber": 20,
+            },
         ]
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": json.dumps(callers_data)}
@@ -42,8 +52,18 @@ class TestCallGraphTools:
 
         # Mock查询结果 - 返回JSON格式的stdout
         callees_data = [
-            {"name": "helper", "filename": "test.c", "signature": "void()", "lineNumber": 30},
-            {"name": "printf", "filename": "libc.so", "signature": "int()", "lineNumber": -1},
+            {
+                "name": "helper",
+                "filename": "test.c",
+                "signature": "void()",
+                "lineNumber": 30,
+            },
+            {
+                "name": "printf",
+                "filename": "libc.so",
+                "signature": "int()",
+                "lineNumber": -1,
+            },
         ]
         mock_query_executor.execute = AsyncMock(
             return_value={"success": True, "stdout": json.dumps(callees_data)}
@@ -118,7 +138,9 @@ class TestCallGraphEdgeCases:
         )
 
         # 正确的调用方式：function_name, max_depth, direction
-        result = await service.get_call_chain("func_a", max_depth=5, direction="up", project_name="test")
+        result = await service.get_call_chain(
+            "func_a", max_depth=5, direction="up", project_name="test"
+        )
 
         assert result["success"] is True
 
@@ -129,7 +151,12 @@ class TestCallGraphEdgeCases:
 
         # 大深度可能返回很多结果
         callers = [
-            {"name": f"caller{i}", "filename": "test.c", "signature": "void()", "lineNumber": i}
+            {
+                "name": f"caller{i}",
+                "filename": "test.c",
+                "signature": "void()",
+                "lineNumber": i,
+            }
             for i in range(100)
         ]
 
@@ -151,12 +178,19 @@ class TestCallGraphEdgeCases:
         mock_query_executor.execute = AsyncMock(
             return_value={
                 "success": True,
-                "stdout": json.dumps([{"name": "func_a", "filename": "test.c"}, {"name": "func_b", "filename": "test.c"}]),
+                "stdout": json.dumps(
+                    [
+                        {"name": "func_a", "filename": "test.c"},
+                        {"name": "func_b", "filename": "test.c"},
+                    ]
+                ),
             }
         )
 
         # 正确的调用方式
-        result = await service.get_call_chain("func_a", max_depth=5, direction="up", project_name="test")
+        result = await service.get_call_chain(
+            "func_a", max_depth=5, direction="up", project_name="test"
+        )
 
         assert result["success"] is True
 

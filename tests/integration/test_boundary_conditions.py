@@ -24,7 +24,9 @@ class TestBoundaryConditions:
         service = CallGraphService(executor)
 
         # 查询不存在的函数
-        result = await service.get_callers("this_function_does_not_exist", project_name=project_name)
+        result = await service.get_callers(
+            "this_function_does_not_exist", project_name=project_name
+        )
 
         # 应该成功但返回空结果
         assert result.get("success"), f"查询应该成功，错误: {result.get('error')}"
@@ -41,7 +43,9 @@ class TestBoundaryConditions:
         service = CallGraphService(executor)
 
         # 查询不存在的函数
-        result = await service.get_callees("this_function_does_not_exist", project_name=project_name)
+        result = await service.get_callees(
+            "this_function_does_not_exist", project_name=project_name
+        )
 
         # 应该成功但返回空结果
         assert result.get("success"), f"查询应该成功，错误: {result.get('error')}"
@@ -59,9 +63,13 @@ class TestBoundaryConditions:
 
         # 测试不同深度
         for depth in [1, 2, 5]:
-            result = await service.get_call_chain("main", max_depth=depth, direction="down", project_name=project_name)
+            result = await service.get_call_chain(
+                "main", max_depth=depth, direction="down", project_name=project_name
+            )
 
-            assert result.get("success"), f"depth={depth}应该成功, error={result.get('error')}"
+            assert result.get("success"), (
+                f"depth={depth}应该成功, error={result.get('error')}"
+            )
             assert result["max_depth"] == depth, f"max_depth应该是{depth}"
             assert "chain" in result, "应该包含chain字段"
             assert isinstance(result["chain"], list), "chain应该是列表"
@@ -78,7 +86,9 @@ class TestBoundaryConditions:
         service = DataFlowService(executor)
 
         # 查询不存在的数据流
-        result = await service.track_dataflow("nonexistent_source", "nonexistent_sink", project_name=project_name)
+        result = await service.track_dataflow(
+            "nonexistent_source", "nonexistent_sink", project_name=project_name
+        )
 
         # 应该成功但返回空结果
         assert result.get("success"), f"查询应该成功，错误: {result.get('error')}"
@@ -87,7 +97,9 @@ class TestBoundaryConditions:
         assert result.get("flows", []) == [], "应该返回空flows"
         assert result.get("count", 0) == 0, "计数应该为0"
 
-    async def test_variable_flow_with_max_flows_limit(self, joern_server, sample_c_code):
+    async def test_variable_flow_with_max_flows_limit(
+        self, joern_server, sample_c_code
+    ):
         """测试max_flows限制"""
         project_name = "boundary_test_5"
         await import_code_safe(joern_server, str(sample_c_code), project_name)
@@ -103,8 +115,9 @@ class TestBoundaryConditions:
 
             if result.get("success") and "flows" in result:
                 flows = result["flows"]
-                assert len(flows) <= max_flows, \
+                assert len(flows) <= max_flows, (
                     f"返回的flows数量({len(flows)})不应超过max_flows({max_flows})"
+                )
 
     async def test_taint_analysis_empty_result(self, joern_server, sample_c_code):
         """测试污点分析返回空结果"""
@@ -141,7 +154,9 @@ class TestBoundaryConditions:
         tasks = [
             callgraph_service.get_callers("main", project_name=project_name),
             callgraph_service.get_callees("process_input", project_name=project_name),
-            callgraph_service.get_call_chain("unsafe_strcpy", max_depth=3, project_name=project_name),
+            callgraph_service.get_call_chain(
+                "unsafe_strcpy", max_depth=3, project_name=project_name
+            ),
             dataflow_service.find_data_dependencies("main", project_name=project_name),
         ]
 
@@ -152,10 +167,13 @@ class TestBoundaryConditions:
             if isinstance(result, Exception):
                 pytest.fail(f"查询{i}抛出异常: {result}")
             assert isinstance(result, dict), f"查询{i}应该返回dict"
-            assert result.get("success") or "error" in result, \
+            assert result.get("success") or "error" in result, (
                 f"查询{i}应该包含success或error字段"
+            )
 
-    async def test_special_characters_in_function_name(self, joern_server, sample_c_code):
+    async def test_special_characters_in_function_name(
+        self, joern_server, sample_c_code
+    ):
         """测试函数名包含特殊字符的情况"""
         project_name = "boundary_test_8"
         await import_code_safe(joern_server, str(sample_c_code), project_name)
@@ -191,8 +209,9 @@ class TestBoundaryConditions:
         is_error = result.get("success") is False or "error" in result
         # 如果没有明确错误，检查是否返回空结果（也是预期行为）
         is_empty_result = result.get("success") and result.get("callers", None) == []
-        assert is_error or is_empty_result, \
+        assert is_error or is_empty_result, (
             f"没有 project_name 应该返回错误或空结果，实际: {result}"
+        )
 
     async def test_zero_depth_query(self, joern_server, sample_c_code):
         """测试depth=0的查询"""
@@ -218,7 +237,9 @@ class TestBoundaryConditions:
         service = CallGraphService(executor)
 
         # 非常大的depth值应该被处理（可能被限制）
-        result = await service.get_call_chain("main", max_depth=100, project_name=project_name)
+        result = await service.get_call_chain(
+            "main", max_depth=100, project_name=project_name
+        )
 
         assert isinstance(result, dict), "应该返回dict"
         assert "success" in result, "应该包含success字段"
@@ -233,7 +254,9 @@ class TestBoundaryConditions:
         service = DataFlowService(executor)
 
         # max_flows=0应该返回空结果
-        result = await service.track_dataflow("gets", "strcpy", max_flows=0, project_name=project_name)
+        result = await service.track_dataflow(
+            "gets", "strcpy", max_flows=0, project_name=project_name
+        )
 
         assert isinstance(result, dict), "应该返回dict"
         if result.get("success") and "flows" in result:

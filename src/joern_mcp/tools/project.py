@@ -49,12 +49,12 @@ def _parse_int_from_output(stdout: str) -> int:
 
     # 尝试从 "val res1: Int = 123" 格式提取
     # 或 "res1: Int = 123" 格式
-    match = re.search(r'=\s*(\d+)', clean)
+    match = re.search(r"=\s*(\d+)", clean)
     if match:
         return int(match.group(1))
 
     # 尝试查找任何数字
-    numbers = re.findall(r'\b(\d+)\b', clean)
+    numbers = re.findall(r"\b(\d+)\b", clean)
     if numbers:
         # 返回最后一个数字（通常是结果值）
         return int(numbers[-1])
@@ -203,7 +203,7 @@ async def get_current_project() -> dict:
     try:
         # 使用更简单的查询获取当前项目信息
         # 先获取当前 CPG 的 root 路径
-        root_query = "cpg.metaData.root.headOption.getOrElse(\"\")"
+        root_query = 'cpg.metaData.root.headOption.getOrElse("")'
         root_result = await server_state.joern_server.execute_query_async(root_query)
 
         if not root_result.get("success"):
@@ -228,7 +228,9 @@ async def get_current_project() -> dict:
 
         # 获取方法数量
         method_query = "cpg.method.size"
-        method_result = await server_state.joern_server.execute_query_async(method_query)
+        method_result = await server_state.joern_server.execute_query_async(
+            method_query
+        )
         if method_result.get("success"):
             method_stdout = method_result.get("stdout", "").strip()
             method_count = _parse_int_from_output(method_stdout)
@@ -241,7 +243,9 @@ async def get_current_project() -> dict:
             file_count = _parse_int_from_output(file_stdout)
 
         # 查找匹配的项目名称
-        projects_query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
+        projects_query = (
+            'workspace.projects.map(p => Map("name" -> p.name, "path" -> p.inputPath))'
+        )
         projects_result = await server_state.joern_server.execute_query_async(
             projects_query
         )
@@ -253,12 +257,15 @@ async def get_current_project() -> dict:
             projects = safe_parse_joern_response(
                 projects_result.get("stdout", ""), default=[]
             )
-            for p_str in projects:
-                if isinstance(p_str, str) and ":::" in p_str:
-                    parts = p_str.split(":::", 1)
-                    if len(parts) == 2 and parts[1] == current_root:
-                        project_name = parts[0]
-                        input_path = parts[1]
+            if not isinstance(projects, list):
+                projects = [projects] if projects else []
+            for p in projects:
+                if isinstance(p, dict):
+                    p_name = p.get("name", "")
+                    p_path = p.get("path", "")
+                    if p_path == current_root:
+                        project_name = p_name
+                        input_path = p_path
                         break
 
         return {
@@ -313,7 +320,7 @@ async def list_projects() -> dict:
 
     try:
         # 首先获取当前活动 CPG 的路径
-        root_query = "cpg.metaData.root.headOption.getOrElse(\"\")"
+        root_query = 'cpg.metaData.root.headOption.getOrElse("")'
         root_result = await server_state.joern_server.execute_query_async(root_query)
         current_root = ""
         if root_result.get("success"):
@@ -321,8 +328,10 @@ async def list_projects() -> dict:
                 root_result.get("stdout", ""), default=""
             )
 
-        # 获取项目列表（使用简单格式避免复杂 Scala 语法）
-        query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
+        # 获取项目列表（返回 JSON 格式）
+        query = (
+            'workspace.projects.map(p => Map("name" -> p.name, "path" -> p.inputPath))'
+        )
         result = await server_state.joern_server.execute_query_async(query)
 
         if result.get("success"):
@@ -336,24 +345,22 @@ async def list_projects() -> dict:
             projects = []
             active_project = None
 
-            for p_str in raw_projects:
-                if isinstance(p_str, str) and ":::" in p_str:
-                    parts = p_str.split(":::", 1)
-                    if len(parts) == 2:
-                        name = parts[0]
-                        input_path = parts[1]
-                        is_active = input_path == current_root
+            for p in raw_projects:
+                if isinstance(p, dict):
+                    name = p.get("name", "")
+                    input_path = p.get("path", "")
+                    is_active = input_path == current_root
 
-                        projects.append(
-                            {
-                                "name": name,
-                                "inputPath": input_path,
-                                "isActive": is_active,
-                            }
-                        )
+                    projects.append(
+                        {
+                            "name": name,
+                            "inputPath": input_path,
+                            "isActive": is_active,
+                        }
+                    )
 
-                        if is_active:
-                            active_project = name
+                if is_active:
+                    active_project = name
 
             logger.info(f"Found {len(projects)} projects, active: {active_project}")
             return {
@@ -462,7 +469,7 @@ async def cleanup_inactive_projects(keep_active: bool = True) -> dict:
 
     try:
         # 首先获取当前活动项目
-        root_query = "cpg.metaData.root.headOption.getOrElse(\"\")"
+        root_query = 'cpg.metaData.root.headOption.getOrElse("")'
         root_result = await server_state.joern_server.execute_query_async(root_query)
         current_root = ""
         if root_result.get("success"):
@@ -471,8 +478,12 @@ async def cleanup_inactive_projects(keep_active: bool = True) -> dict:
             )
 
         # 获取所有项目
-        projects_query = 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
-        projects_result = await server_state.joern_server.execute_query_async(projects_query)
+        projects_query = (
+            'workspace.projects.map(p => Map("name" -> p.name, "path" -> p.inputPath))'
+        )
+        projects_result = await server_state.joern_server.execute_query_async(
+            projects_query
+        )
 
         if not projects_result.get("success"):
             return {
@@ -491,16 +502,15 @@ async def cleanup_inactive_projects(keep_active: bool = True) -> dict:
         kept = []
         errors = []
 
-        for p_str in raw_projects:
-            if not isinstance(p_str, str) or ":::" not in p_str:
+        for p in raw_projects:
+            if not isinstance(p, dict):
                 continue
 
-            parts = p_str.split(":::", 1)
-            if len(parts) != 2:
+            name = p.get("name", "")
+            input_path = p.get("path", "")
+            if not name or not input_path:
                 continue
 
-            name = parts[0]
-            input_path = parts[1]
             is_active = input_path == current_root
 
             if is_active and keep_active:
@@ -509,17 +519,23 @@ async def cleanup_inactive_projects(keep_active: bool = True) -> dict:
 
             # 删除非活跃项目
             delete_query = f'delete("{name}")'
-            delete_result = await server_state.joern_server.execute_query_async(delete_query)
+            delete_result = await server_state.joern_server.execute_query_async(
+                delete_query
+            )
 
             if delete_result.get("success"):
                 deleted.append(name)
                 logger.info(f"Deleted inactive project: {name}")
             else:
-                errors.append({
-                    "name": name,
-                    "error": delete_result.get("stderr", "Unknown error"),
-                })
-                logger.warning(f"Failed to delete project {name}: {delete_result.get('stderr')}")
+                errors.append(
+                    {
+                        "name": name,
+                        "error": delete_result.get("stderr", "Unknown error"),
+                    }
+                )
+                logger.warning(
+                    f"Failed to delete project {name}: {delete_result.get('stderr')}"
+                )
 
         return {
             "success": True,

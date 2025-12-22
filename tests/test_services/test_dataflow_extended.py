@@ -98,8 +98,12 @@ class TestDataFlowServiceExtended:
         )
 
         # 测试不同的max_flows值
-        result1 = await service.track_dataflow("src", "sink", max_flows=5, project_name="test")
+        result1 = await service.track_dataflow(
+            "src", "sink", max_flows=5, project_name="test"
+        )
         assert result1["success"] is True
 
-        result2 = await service.track_dataflow("src", "sink", max_flows=20, project_name="test")
+        result2 = await service.track_dataflow(
+            "src", "sink", max_flows=20, project_name="test"
+        )
         assert result2["success"] is True

@@ -23,7 +23,7 @@ def get_tool_fn(tool):
     MCP 工具被 @mcp.tool() 装饰后变成 FunctionTool 对象，
     需要通过 .fn 属性获取原始函数。
     """
-    if hasattr(tool, 'fn'):
+    if hasattr(tool, "fn"):
         return tool.fn
     return tool
 
@@ -105,7 +105,9 @@ class TestProjectToolsReal:
         """测试 parse_project 工具"""
         from joern_mcp.tools.project import parse_project
 
-        result = await get_tool_fn(parse_project)(str(sample_c_code), "test_parse_project")
+        result = await get_tool_fn(parse_project)(
+            str(sample_c_code), "test_parse_project"
+        )
 
         logger.info(f"parse_project result: {result}")
 
@@ -281,7 +283,9 @@ class TestQueryToolsReal:
         from joern_mcp.tools.query import search_code
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(search_code)("query_tools_test", "main", scope="methods")
+        result = await get_tool_fn(search_code)(
+            "query_tools_test", "main", scope="methods"
+        )
 
         logger.info(f"search_code result: {result}")
 
@@ -313,7 +317,9 @@ class TestCallgraphToolsReal:
         from joern_mcp.tools.callgraph import get_callers
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(get_callers)("callgraph_tools_test", "vulnerable_function")
+        result = await get_tool_fn(get_callers)(
+            "callgraph_tools_test", "vulnerable_function"
+        )
 
         logger.info(f"get_callers result: {result}")
 
@@ -339,7 +345,9 @@ class TestCallgraphToolsReal:
         from joern_mcp.tools.callgraph import get_call_chain
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(get_call_chain)("callgraph_tools_test", "main", max_depth=3)
+        result = await get_tool_fn(get_call_chain)(
+            "callgraph_tools_test", "main", max_depth=3
+        )
 
         logger.info(f"get_call_chain result: {result}")
 
@@ -352,7 +360,9 @@ class TestCallgraphToolsReal:
         from joern_mcp.tools.callgraph import get_call_graph
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(get_call_graph)("callgraph_tools_test", "main", depth=1)
+        result = await get_tool_fn(get_call_graph)(
+            "callgraph_tools_test", "main", depth=1
+        )
 
         logger.info(f"get_call_graph result: {result}")
 
@@ -388,7 +398,9 @@ class TestDataflowToolsReal:
         from joern_mcp.tools.dataflow import track_dataflow
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(track_dataflow)("dataflow_tools_test", "gets", "strcpy")
+        result = await get_tool_fn(track_dataflow)(
+            "dataflow_tools_test", "gets", "strcpy"
+        )
 
         logger.info(f"track_dataflow result: {result}")
 
@@ -401,7 +413,9 @@ class TestDataflowToolsReal:
         from joern_mcp.tools.dataflow import find_data_dependencies
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(find_data_dependencies)("dataflow_tools_test", "main")
+        result = await get_tool_fn(find_data_dependencies)(
+            "dataflow_tools_test", "main"
+        )
 
         logger.info(f"find_data_dependencies result: {result}")
 
@@ -414,7 +428,9 @@ class TestDataflowToolsReal:
         from joern_mcp.tools.dataflow import analyze_variable_flow
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(analyze_variable_flow)("dataflow_tools_test", "buffer")
+        result = await get_tool_fn(analyze_variable_flow)(
+            "dataflow_tools_test", "buffer"
+        )
 
         logger.info(f"analyze_variable_flow result: {result}")
 
@@ -459,7 +475,9 @@ class TestTaintToolsReal:
         from joern_mcp.tools.taint import check_taint_flow
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(check_taint_flow)("taint_tools_test", "gets", "strcpy")
+        result = await get_tool_fn(check_taint_flow)(
+            "taint_tools_test", "gets", "strcpy"
+        )
 
         logger.info(f"check_taint_flow result: {result}")
 
@@ -580,7 +598,9 @@ class TestBatchToolsReal:
         from joern_mcp.tools.batch import batch_function_analysis
 
         # project_name 现在是第一个必填参数
-        result = await get_tool_fn(batch_function_analysis)("batch_tools_test", ["main"])
+        result = await get_tool_fn(batch_function_analysis)(
+            "batch_tools_test", ["main"]
+        )
 
         logger.info(f"batch_function_analysis result: {result}")
 
@@ -626,11 +646,7 @@ class TestExportToolsReal:
         from joern_mcp.tools.export import export_analysis_results
 
         output_path = str(tmp_path / "results.json")
-        test_data = {
-            "vulnerabilities": [
-                {"name": "test_vuln", "severity": "HIGH"}
-            ]
-        }
+        test_data = {"vulnerabilities": [{"name": "test_vuln", "severity": "HIGH"}]}
         result = await get_tool_fn(export_analysis_results)(
             test_data, output_path, format="json"
         )

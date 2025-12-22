@@ -161,7 +161,9 @@ async def demo_vulnerability_detection(executor: OptimizedQueryExecutor):
 
     # 5. 检查格式化字符串
     print("\n5. 检查格式化字符串漏洞:")
-    fmt = await service.check_specific_flow("gets|scanf|argv", "printf|sprintf", max_flows=3)
+    fmt = await service.check_specific_flow(
+        "gets|scanf|argv", "printf|sprintf", max_flows=3
+    )
     print_result(fmt, indent=1)
 
 
@@ -203,6 +205,7 @@ async def main():
 
     # 启动Joern服务器（使用随机端口避免冲突）
     import random
+
     port = random.randint(20000, 30000)
     print(f"\n启动Joern服务器（端口: {port}）...")
     server = JoernServerManager(host="localhost", port=port)
@@ -257,4 +260,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

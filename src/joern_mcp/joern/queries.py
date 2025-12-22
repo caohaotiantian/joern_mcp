@@ -6,7 +6,9 @@
 """
 
 
-def import_code_query(path: str, project_name: str | None = None, language: str | None = None) -> str:
+def import_code_query(
+    path: str, project_name: str | None = None, language: str | None = None
+) -> str:
     """构建 importCode 查询
 
     Args:
@@ -89,9 +91,9 @@ def list_projects_query() -> str:
     """列出所有项目
 
     Returns:
-        查询字符串，返回项目名称和路径列表
+        查询字符串，返回项目名称和路径列表（JSON 格式）
     """
-    return 'workspace.projects.map(p => s"${p.name}:::${p.inputPath}").l'
+    return 'workspace.projects.map(p => Map("name" -> p.name, "path" -> p.inputPath))'
 
 
 def cpg_root_query() -> str:
@@ -120,20 +122,20 @@ def list_methods_query(limit: int = 100, name_filter: str | None = None) -> str:
         查询字符串
     """
     if name_filter:
-        return f'''cpg.method.name(".*{name_filter}.*")
+        return f"""cpg.method.name(".*{name_filter}.*")
            .take({limit})
            .map(m => Map(
                "name" -> m.name,
                "filename" -> m.filename,
                "lineNumber" -> m.lineNumber.getOrElse(-1)
-           ))'''
-    return f'''cpg.method
+           ))"""
+    return f"""cpg.method
            .take({limit})
            .map(m => Map(
                "name" -> m.name,
                "filename" -> m.filename,
                "lineNumber" -> m.lineNumber.getOrElse(-1)
-           ))'''
+           ))"""
 
 
 def get_function_query(function_name: str) -> str:
@@ -156,7 +158,7 @@ def get_function_query(function_name: str) -> str:
            ))'''
 
 
-def get_callers_query(function_name: str, depth: int = 1) -> str:
+def get_callers_query(function_name: str) -> str:
     """获取函数调用者
 
     使用 .callIn 获取调用节点，而非 .caller 获取方法定义。
@@ -187,7 +189,7 @@ def get_callers_query(function_name: str, depth: int = 1) -> str:
            .dedup'''
 
 
-def get_callees_query(function_name: str, depth: int = 1) -> str:
+def get_callees_query(function_name: str) -> str:
     """获取函数调用的其他函数
 
     使用 .call 获取调用节点，而非 .callee 获取方法定义。
@@ -228,7 +230,7 @@ def get_cfg_query(function_name: str) -> str:
     Returns:
         查询字符串
     """
-    return f'cpg.method.name("{function_name}").dotCfg.l'
+    return f'cpg.method.name("{function_name}").dotCfg.head'
 
 
 def get_dominators_query(function_name: str) -> str:
@@ -240,7 +242,7 @@ def get_dominators_query(function_name: str) -> str:
     Returns:
         查询字符串
     """
-    return f'cpg.method.name("{function_name}").dotDom.l'
+    return f'cpg.method.name("{function_name}").dotDom.head'
 
 
 def search_code_query(pattern: str, scope: str = "all", limit: int = 50) -> str:
@@ -263,10 +265,9 @@ def search_code_query(pattern: str, scope: str = "all", limit: int = 50) -> str:
     else:
         base = f'cpg.all.code(".*{pattern}.*")'
 
-    return f'''{base}.take({limit}).map(n => Map(
+    return f"""{base}.take({limit}).map(n => Map(
             "code" -> n.code,
             "type" -> n.label,
             "file" -> n.file.name.headOption.getOrElse("unknown"),
             "line" -> n.lineNumber.getOrElse(-1)
-        ))'''
-
+        ))"""

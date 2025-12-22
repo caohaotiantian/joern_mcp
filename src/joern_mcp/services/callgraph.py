@@ -40,7 +40,9 @@ class CallGraphService:
         Returns:
             dict: 调用者列表，包含调用点的位置信息
         """
-        logger.info(f"Getting callers for function: {function_name} (project: {project_name or 'current'})")
+        logger.info(
+            f"Getting callers for function: {function_name} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性
@@ -108,7 +110,9 @@ class CallGraphService:
         Returns:
             dict: 被调用函数列表，包含调用点的位置信息
         """
-        logger.info(f"Getting callees for function: {function_name} (project: {project_name or 'current'})")
+        logger.info(
+            f"Getting callees for function: {function_name} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性
@@ -271,7 +275,9 @@ class CallGraphService:
         Returns:
             dict: 调用图数据（节点和边）
         """
-        logger.info(f"Building call graph for function: {function_name} (project: {project_name or 'current'})")
+        logger.info(
+            f"Building call graph for function: {function_name} (project: {project_name or 'current'})"
+        )
 
         graph = {"success": True, "function": function_name, "nodes": [], "edges": []}
         if project_name:
@@ -283,25 +289,25 @@ class CallGraphService:
 
         try:
             # 添加目标函数
-            graph["nodes"].append({
-                "id": function_name,
-                "type": "target",
-                "filename": "",
-                "lineNumber": -1,
-            })
+            graph["nodes"].append(
+                {
+                    "id": function_name,
+                    "type": "target",
+                    "filename": "",
+                    "lineNumber": -1,
+                }
+            )
 
             # 递归收集调用者（向上追溯 depth 层）
             if include_callers:
                 await self._collect_callers_recursive(
-                    function_name, depth, project_name,
-                    graph, visited_callers
+                    function_name, depth, project_name, graph, visited_callers
                 )
 
             # 递归收集被调用者（向下追溯 depth 层）
             if include_callees:
                 await self._collect_callees_recursive(
-                    function_name, depth, project_name,
-                    graph, visited_callees
+                    function_name, depth, project_name, graph, visited_callees
                 )
 
             # 去重节点
@@ -346,30 +352,33 @@ class CallGraphService:
                 caller_name = caller.get("name", "unknown")
 
                 # 添加节点（包含完整的调用信息）
-                graph["nodes"].append({
-                    "id": caller_name,
-                    "type": "caller",
-                    "methodFullName": caller.get("methodFullName", ""),
-                    "signature": caller.get("signature", ""),
-                    "filename": caller.get("filename", ""),
-                    "lineNumber": caller.get("lineNumber", -1),
-                    "code": caller.get("code", ""),
-                })
+                graph["nodes"].append(
+                    {
+                        "id": caller_name,
+                        "type": "caller",
+                        "methodFullName": caller.get("methodFullName", ""),
+                        "signature": caller.get("signature", ""),
+                        "filename": caller.get("filename", ""),
+                        "lineNumber": caller.get("lineNumber", -1),
+                        "code": caller.get("code", ""),
+                    }
+                )
 
                 # 添加边（包含调用位置信息）
-                graph["edges"].append({
-                    "from": caller_name,
-                    "to": function_name,
-                    "type": "calls",
-                    "lineNumber": caller.get("lineNumber", -1),
-                    "code": caller.get("code", ""),
-                })
+                graph["edges"].append(
+                    {
+                        "from": caller_name,
+                        "to": function_name,
+                        "type": "calls",
+                        "lineNumber": caller.get("lineNumber", -1),
+                        "code": caller.get("code", ""),
+                    }
+                )
 
                 # 递归收集更上层的调用者
                 if remaining_depth > 1 and caller_name not in visited:
                     await self._collect_callers_recursive(
-                        caller_name, remaining_depth - 1, project_name,
-                        graph, visited
+                        caller_name, remaining_depth - 1, project_name, graph, visited
                     )
 
     async def _collect_callees_recursive(
@@ -395,28 +404,31 @@ class CallGraphService:
                 callee_name = callee.get("name", "unknown")
 
                 # 添加节点（包含完整的调用信息）
-                graph["nodes"].append({
-                    "id": callee_name,
-                    "type": "callee",
-                    "methodFullName": callee.get("methodFullName", ""),
-                    "signature": callee.get("signature", ""),
-                    "filename": callee.get("filename", ""),
-                    "lineNumber": callee.get("lineNumber", -1),
-                    "code": callee.get("code", ""),
-                })
+                graph["nodes"].append(
+                    {
+                        "id": callee_name,
+                        "type": "callee",
+                        "methodFullName": callee.get("methodFullName", ""),
+                        "signature": callee.get("signature", ""),
+                        "filename": callee.get("filename", ""),
+                        "lineNumber": callee.get("lineNumber", -1),
+                        "code": callee.get("code", ""),
+                    }
+                )
 
                 # 添加边（包含调用位置信息）
-                graph["edges"].append({
-                    "from": function_name,
-                    "to": callee_name,
-                    "type": "calls",
-                    "lineNumber": callee.get("lineNumber", -1),
-                    "code": callee.get("code", ""),
-                })
+                graph["edges"].append(
+                    {
+                        "from": function_name,
+                        "to": callee_name,
+                        "type": "calls",
+                        "lineNumber": callee.get("lineNumber", -1),
+                        "code": callee.get("code", ""),
+                    }
+                )
 
                 # 递归收集更下层的被调用者
                 if remaining_depth > 1 and callee_name not in visited:
                     await self._collect_callees_recursive(
-                        callee_name, remaining_depth - 1, project_name,
-                        graph, visited
+                        callee_name, remaining_depth - 1, project_name, graph, visited
                     )

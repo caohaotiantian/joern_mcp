@@ -66,7 +66,9 @@ def test_search_calls_pattern():
 
 def test_search_identifiers_pattern():
     """测试搜索标识符模式查询"""
-    query = QueryTemplates.build("SEARCH_IDENTIFIERS_BY_PATTERN", pattern="user", limit=25)
+    query = QueryTemplates.build(
+        "SEARCH_IDENTIFIERS_BY_PATTERN", pattern="user", limit=25
+    )
     assert "user" in query
     assert "take(25)" in query
     assert "IDENTIFIER" in query

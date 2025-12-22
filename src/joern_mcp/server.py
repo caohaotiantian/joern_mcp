@@ -38,7 +38,9 @@ async def health_check() -> dict:
     if not is_healthy:
         # 添加更多诊断信息
         if not process_running:
-            result["error"] = "Joern server process is not running. It may have crashed or failed to start."
+            result["error"] = (
+                "Joern server process is not running. It may have crashed or failed to start."
+            )
         else:
             result["error"] = (
                 "Joern server process is running but not responding. "
@@ -64,7 +66,7 @@ async def execute_query(
         dict: 查询结果
 
     Example:
-        >>> await execute_query("cpg.method.name.l")
+        >>> await execute_query("cpg.method.name")
         {"success": True, "result": ["main", "foo", "bar"]}
     """
     if not server_state.query_executor:

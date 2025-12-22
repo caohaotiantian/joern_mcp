@@ -37,7 +37,7 @@ def _parse_boolean_result(stdout: str) -> bool | None:
         return False
 
     # 从 "val res0: Boolean = true" 格式提取
-    match = re.search(r'=\s*(true|false)', clean)
+    match = re.search(r"=\s*(true|false)", clean)
     if match:
         return match.group(1) == "true"
 
@@ -60,25 +60,26 @@ async def list_available_projects(query_executor) -> list[str]:
         项目名称列表
     """
     try:
-        query = 'workspace.projects.map(_.name).l'
-        result = await query_executor.execute(query, format="raw")
+        query = "workspace.projects.map(_.name)"
+        result = await query_executor.execute(query)
 
         if result.get("success"):
-            stdout = result.get("stdout", "").strip()
-            # 解析 List("name1", "name2") 格式
-            list_match = re.search(r'List\s*\((.*)\)', stdout, re.DOTALL)
-            if list_match:
-                content = list_match.group(1)
-                # 提取引号内的字符串
-                names = re.findall(r'"([^"]*)"', content)
-                return names
+            from joern_mcp.utils.response_parser import safe_parse_joern_response
+
+            stdout = result.get("stdout", "")
+            projects = safe_parse_joern_response(stdout, default=[])
+            if not isinstance(projects, list):
+                projects = [projects] if projects else []
+            return projects
         return []
     except Exception as e:
         logger.debug(f"Failed to list projects: {e}")
         return []
 
 
-async def validate_project_exists(query_executor, project_name: str) -> tuple[bool, str | None]:
+async def validate_project_exists(
+    query_executor, project_name: str
+) -> tuple[bool, str | None]:
     """验证项目是否存在
 
     Args:
@@ -116,7 +117,10 @@ async def validate_project_exists(query_executor, project_name: str) -> tuple[bo
             else:
                 # 无法解析结果，记录警告
                 logger.warning(f"Cannot parse isDefined result: {stdout}")
-                return False, f"Cannot determine if project '{project_name}' exists. Raw output: {stdout[:100]}"
+                return (
+                    False,
+                    f"Cannot determine if project '{project_name}' exists. Raw output: {stdout[:100]}",
+                )
         else:
             stderr = result.get("stderr", "Unknown error")
             # 检查是否是编译错误（项目不存在导致的）
@@ -128,7 +132,9 @@ async def validate_project_exists(query_executor, project_name: str) -> tuple[bo
         return False, str(e)
 
 
-async def validate_project_has_cpg(query_executor, project_name: str) -> tuple[bool, str | None]:
+async def validate_project_has_cpg(
+    query_executor, project_name: str
+) -> tuple[bool, str | None]:
     """验证项目是否已加载 CPG
 
     Args:
@@ -153,7 +159,7 @@ async def validate_project_has_cpg(query_executor, project_name: str) -> tuple[b
         if result.get("success"):
             stdout = result.get("stdout", "").strip()
             # 如果输出包含数字（包括 0），说明 CPG 已加载
-            if re.search(r'\d+', stdout):
+            if re.search(r"\d+", stdout):
                 return True, None
             # 如果输出不包含数字但查询成功，可能是空 CPG（仍然算已加载）
             logger.debug(f"CPG query returned non-numeric: {stdout}")
@@ -166,7 +172,9 @@ async def validate_project_has_cpg(query_executor, project_name: str) -> tuple[b
         if "None.get" in stderr or "NoSuchElementException" in stderr:
             # 项目存在但 CPG 未加载，尝试加载它
             # 注意：不要返回错误，而是直接尝试用 open 加载
-            logger.info(f"CPG for project '{project_name}' not loaded, attempting to load...")
+            logger.info(
+                f"CPG for project '{project_name}' not loaded, attempting to load..."
+            )
 
             # 使用 open 命令加载 CPG
             open_query = f'open("{project_name}")'
@@ -177,8 +185,10 @@ async def validate_project_has_cpg(query_executor, project_name: str) -> tuple[b
                 verify_result = await query_executor.execute(query, format="raw")
                 if verify_result.get("success"):
                     stdout = verify_result.get("stdout", "").strip()
-                    if re.search(r'\d+', stdout):
-                        logger.info(f"Successfully loaded CPG for project '{project_name}'")
+                    if re.search(r"\d+", stdout):
+                        logger.info(
+                            f"Successfully loaded CPG for project '{project_name}'"
+                        )
                         return True, None
 
             # 加载失败
@@ -188,7 +198,10 @@ async def validate_project_has_cpg(query_executor, project_name: str) -> tuple[b
             )
 
         # 其他错误
-        return False, f"Failed to access CPG for project '{project_name}': {stderr[:200]}"
+        return (
+            False,
+            f"Failed to access CPG for project '{project_name}': {stderr[:200]}",
+        )
 
     except Exception as e:
         logger.exception(f"Error validating CPG: {e}")
@@ -232,7 +245,10 @@ async def get_safe_cpg_prefix(
             - (None, error_message) 如果失败
     """
     if not project_name:
-        return None, "project_name is required. Use list_projects to see available projects."
+        return (
+            None,
+            "project_name is required. Use list_projects to see available projects.",
+        )
 
     # 验证项目和 CPG
     has_cpg, error = await validate_project_has_cpg(query_executor, project_name)
@@ -240,4 +256,3 @@ async def get_safe_cpg_prefix(
         return None, error
 
     return f'workspace.project("{project_name}").get.cpg.get', None
-

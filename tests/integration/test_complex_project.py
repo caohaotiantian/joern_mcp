@@ -83,12 +83,12 @@ class TestComplexProject:
             # 验证节点结构（节点可能使用id或name字段）
             for i, node in enumerate(nodes):
                 assert isinstance(node, dict), f"node[{i}]应该是dict"
-                assert "id" in node or "name" in node, \
+                assert "id" in node or "name" in node, (
                     f"node[{i}]应该包含id或name字段，实际: {node.keys()}"
+                )
                 # 验证type字段
                 if "type" in node:
-                    assert isinstance(node["type"], str), \
-                        f"node[{i}].type应该是字符串"
+                    assert isinstance(node["type"], str), f"node[{i}].type应该是字符串"
 
             # 记录节点名称用于调试
             node_names = [n.get("id", n.get("name", "unknown")) for n in nodes]
@@ -106,16 +106,16 @@ class TestComplexProject:
 
         # 测试不同深度的调用链
         for depth in [1, 3, 5]:
-            result = await service.get_call_chain("main", max_depth=depth, direction="down")
+            result = await service.get_call_chain(
+                "main", max_depth=depth, direction="down"
+            )
 
             assert result.get("success"), f"depth={depth}应该成功"
             assert result["max_depth"] == depth, f"max_depth应该是{depth}"
             assert "chain" in result, "应该包含chain"
             assert isinstance(result["chain"], list), "chain应该是列表"
 
-            logger.info(
-                f"Depth={depth}: 返回{len(result['chain'])}个节点"
-            )
+            logger.info(f"Depth={depth}: 返回{len(result['chain'])}个节点")
 
     async def test_buffer_overflow_detection(self, joern_server, complex_c_project):
         """测试缓冲区溢出检测"""
@@ -178,7 +178,9 @@ class TestComplexProject:
         assert isinstance(result, dict), "应该返回dict"
         assert "success" in result, "应该包含success字段"
         assert result.get("source_method") == "main", "source_method应该是main"
-        assert result.get("sink_method") == "process_data", "sink_method应该是process_data"
+        assert result.get("sink_method") == "process_data", (
+            "sink_method应该是process_data"
+        )
 
         # 如果成功，验证flows
         if result.get("success") and result.get("flows"):
@@ -193,10 +195,10 @@ class TestComplexProject:
 
                 # 验证路径长度
                 if "pathLength" in flow:
-                    assert isinstance(flow["pathLength"], int), \
+                    assert isinstance(flow["pathLength"], int), (
                         f"flow[{i}].pathLength应该是整数"
-                    assert flow["pathLength"] > 0, \
-                        f"flow[{i}].pathLength应该大于0"
+                    )
+                    assert flow["pathLength"] > 0, f"flow[{i}].pathLength应该大于0"
 
     async def test_vulnerability_functions(self, joern_server, complex_c_project):
         """测试识别漏洞函数"""
@@ -246,15 +248,16 @@ class TestComplexProject:
             # 验证每个依赖的结构
             for i, dep in enumerate(deps):
                 if isinstance(dep, dict):
-                    assert "variable" in dep or "code" in dep, \
+                    assert "variable" in dep or "code" in dep, (
                         f"dependency[{i}]应该包含variable或code"
+                    )
 
     async def test_function_complexity_check(self, joern_server, complex_c_project):
         """测试函数复杂度检查"""
         await import_code_safe(joern_server, str(complex_c_project), "complexity_test")
 
         # 查询每个函数的行数作为复杂度指标
-        query = 'cpg.method.map(m => (m.name, m.numberOfLines)).l'
+        query = "cpg.method.map(m => (m.name, m.numberOfLines)).l"
         result = await execute_query_safe(joern_server, query)
 
         assert result.get("success"), "查询函数复杂度应该成功"
@@ -266,7 +269,9 @@ class TestComplexProject:
 
     async def test_callgraph_callers_validation(self, joern_server, complex_c_project):
         """测试调用图的caller分析 - 增强验证"""
-        await import_code_safe(joern_server, str(complex_c_project), "callers_validation")
+        await import_code_safe(
+            joern_server, str(complex_c_project), "callers_validation"
+        )
 
         executor = QueryExecutor(joern_server)
         service = CallGraphService(executor)
@@ -288,18 +293,19 @@ class TestComplexProject:
         for i, caller in enumerate(callers):
             assert isinstance(caller, dict), f"caller[{i}]应该是dict"
             assert "name" in caller, f"caller[{i}]应该包含name字段"
-            assert isinstance(caller["name"], str), \
-                f"caller[{i}].name应该是字符串"
+            assert isinstance(caller["name"], str), f"caller[{i}].name应该是字符串"
 
             # 验证可选字段的类型
             if "filename" in caller:
-                assert isinstance(caller["filename"], str), \
+                assert isinstance(caller["filename"], str), (
                     f"caller[{i}].filename应该是字符串"
+                )
             if "lineNumber" in caller:
-                assert isinstance(caller["lineNumber"], int) or caller["lineNumber"] == -1, \
-                    f"caller[{i}].lineNumber应该是整数"
+                assert (
+                    isinstance(caller["lineNumber"], int) or caller["lineNumber"] == -1
+                ), f"caller[{i}].lineNumber应该是整数"
 
         # count应该与callers长度一致
-        assert result["count"] == len(callers), \
+        assert result["count"] == len(callers), (
             f"count({result['count']})应该等于callers长度({len(callers)})"
-
+        )

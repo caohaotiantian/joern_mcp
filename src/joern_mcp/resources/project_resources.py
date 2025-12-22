@@ -20,22 +20,20 @@ async def list_projects_resource() -> str:
             return '{"success": false, "error": "Query executor not initialized"}'
 
         # workspace.projects 返回 List[Project]
-        # 使用 .map(_.name) 提取名称列表
-        query = "workspace.projects.map(_.name).l"
-        result = await server_state.query_executor.execute(query, format="raw")
+        # 使用 .map(_.name) 提取名称列表，返回 JSON 格式
+        query = "workspace.projects.map(_.name)"
+        result = await server_state.query_executor.execute(query)
 
         if result.get("success"):
-            stdout = result.get("stdout", "[]").strip()
-            # 解析 Scala List 格式 List("name1", "name2")
-            import re
-            list_match = re.search(r'List\s*\((.*)\)', stdout, re.DOTALL)
-            if list_match:
-                content = list_match.group(1)
-                # 提取引号内的字符串
-                names = re.findall(r'"([^"]*)"', content)
-                import orjson
-                return orjson.dumps({"success": True, "projects": names}).decode()
-            return f'{{"success": true, "projects": [], "raw": "{stdout}"}}'
+            from joern_mcp.utils.response_parser import safe_parse_joern_response
+
+            stdout = result.get("stdout", "[]")
+            projects = safe_parse_joern_response(stdout, default=[])
+            if not isinstance(projects, list):
+                projects = [projects] if projects else []
+            import orjson
+
+            return orjson.dumps({"success": True, "projects": projects}).decode()
         else:
             return f'{{"success": false, "error": "{result.get("stderr", "Unknown error")}"}}'
     except Exception as e:

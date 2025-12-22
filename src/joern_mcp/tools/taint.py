@@ -56,7 +56,9 @@ async def find_vulnerabilities(
         }
 
     service = TaintAnalysisService(server_state.query_executor)
-    return await service.find_vulnerabilities(rule_name, severity, max_flows, project_name)
+    return await service.find_vulnerabilities(
+        rule_name, severity, max_flows, project_name
+    )
 
 
 @mcp.tool()
@@ -94,7 +96,9 @@ async def check_taint_flow(
         return {"success": False, "error": "Max flows must be between 1 and 50"}
 
     service = TaintAnalysisService(server_state.query_executor)
-    return await service.check_specific_flow(source_pattern, sink_pattern, max_flows, project_name)
+    return await service.check_specific_flow(
+        source_pattern, sink_pattern, max_flows, project_name
+    )
 
 
 @mcp.tool()

@@ -14,9 +14,7 @@ from joern_mcp.services.callgraph import CallGraphService
 
 
 @mcp.tool()
-async def get_callers(
-    project_name: str, function_name: str, depth: int = 1
-) -> dict:
+async def get_callers(project_name: str, function_name: str, depth: int = 1) -> dict:
     """
     获取函数的调用者
 
@@ -56,9 +54,7 @@ async def get_callers(
 
 
 @mcp.tool()
-async def get_callees(
-    project_name: str, function_name: str, depth: int = 1
-) -> dict:
+async def get_callees(project_name: str, function_name: str, depth: int = 1) -> dict:
     """
     获取函数调用的其他函数
 
@@ -139,7 +135,9 @@ async def get_call_chain(
         return {"success": False, "error": "Direction must be 'up' or 'down'"}
 
     service = CallGraphService(server_state.query_executor)
-    return await service.get_call_chain(function_name, max_depth, direction, project_name)
+    return await service.get_call_chain(
+        function_name, max_depth, direction, project_name
+    )
 
 
 @mcp.tool()

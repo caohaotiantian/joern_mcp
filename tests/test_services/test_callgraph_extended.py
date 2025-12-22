@@ -73,7 +73,7 @@ class TestCallGraphServiceExtended:
         mock_query_executor.execute = AsyncMock(
             return_value={
                 "success": True,
-                "stdout": '[{"name": "caller", "filename": "main.c", "lineNumber": 10, "signature": "int()"}]'
+                "stdout": '[{"name": "caller", "filename": "main.c", "lineNumber": 10, "signature": "int()"}]',
             }
         )
 
@@ -139,7 +139,12 @@ class TestCallGraphServiceExtended:
         service = CallGraphService(mock_query_executor)
 
         callees_data = [
-            {"name": f"func_{i}", "filename": "test.c", "lineNumber": i, "signature": "void()"}
+            {
+                "name": f"func_{i}",
+                "filename": "test.c",
+                "lineNumber": i,
+                "signature": "void()",
+            }
             for i in range(10)
         ]
 

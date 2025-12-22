@@ -18,7 +18,11 @@ from loguru import logger
 
 # 配置日志
 logger.remove()
-logger.add(sys.stderr, level="INFO", format="<green>{time:HH:mm:ss}</green> | <level>{message}</level>")
+logger.add(
+    sys.stderr,
+    level="INFO",
+    format="<green>{time:HH:mm:ss}</green> | <level>{message}</level>",
+)
 
 
 async def main():
@@ -61,15 +65,17 @@ async def main():
         await asyncio.sleep(2)
 
         # ========== 测试 1: get_callers ==========
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("测试 1: get_callers - 查找谁调用了指定函数")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         test_functions = ["log_message", "query_user", "exec_query"]
 
         for func in test_functions:
             logger.info(f"\n查找 {func} 的调用者 (depth=1):")
-            result = await callgraph_service.get_callers(func, depth=1, project_name=project_name)
+            result = await callgraph_service.get_callers(
+                func, depth=1, project_name=project_name
+            )
 
             if result.get("success"):
                 callers = result.get("callers", [])
@@ -84,15 +90,17 @@ async def main():
                 logger.warning(f"  查询失败: {result.get('error')}")
 
         # ========== 测试 2: get_callees ==========
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("测试 2: get_callees - 查找函数调用了哪些其他函数")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         test_functions = ["main", "authenticate", "check_password", "init_app"]
 
         for func in test_functions:
             logger.info(f"\n查找 {func} 调用的函数 (depth=1):")
-            result = await callgraph_service.get_callees(func, depth=1, project_name=project_name)
+            result = await callgraph_service.get_callees(
+                func, depth=1, project_name=project_name
+            )
 
             if result.get("success"):
                 callees = result.get("callees", [])
@@ -106,9 +114,9 @@ async def main():
                 logger.warning(f"  查询失败: {result.get('error')}")
 
         # ========== 测试 3: get_call_chain ==========
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("测试 3: get_call_chain - 追溯调用链")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         # 向上追溯
         logger.info("\n从 log_message 向上追溯 (direction='up', max_depth=3):")
@@ -143,9 +151,9 @@ async def main():
             logger.warning(f"  查询失败: {result.get('error')}")
 
         # ========== 测试 4: get_call_graph ==========
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("测试 4: get_call_graph - 获取完整调用图")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         test_functions = ["authenticate", "process_request"]
 
@@ -156,7 +164,7 @@ async def main():
                 include_callers=True,
                 include_callees=True,
                 depth=2,
-                project_name=project_name
+                project_name=project_name,
             )
 
             if result.get("success"):
@@ -173,7 +181,9 @@ async def main():
                 logger.info("  边 (调用关系):")
                 for edge in edges[:5]:
                     if isinstance(edge, dict):
-                        logger.info(f"    {edge.get('from', '?')} -> {edge.get('to', '?')}")
+                        logger.info(
+                            f"    {edge.get('from', '?')} -> {edge.get('to', '?')}"
+                        )
                     else:
                         logger.info(f"    {edge[0]} -> {edge[1]}")
                 if len(edges) > 5:
@@ -182,9 +192,9 @@ async def main():
                 logger.warning(f"  查询失败: {result.get('error')}")
 
         # ========== 测试完成 ==========
-        logger.info("\n" + "="*60)
+        logger.info("\n" + "=" * 60)
         logger.info("所有调用图测试完成!")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
     except Exception as e:
         logger.exception(f"测试失败: {e}")
@@ -196,4 +206,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

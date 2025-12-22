@@ -51,7 +51,9 @@ def cleanup_projects_after_test(joern_server, event_loop):
     async def cleanup():
         try:
             # 删除所有项目
-            await joern_server.execute_query_async('workspace.projects.foreach(p => delete(p.name))')
+            await joern_server.execute_query_async(
+                "workspace.projects.foreach(p => delete(p.name))"
+            )
         except Exception:
             # 忽略清理错误
             pass

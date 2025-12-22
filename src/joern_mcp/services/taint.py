@@ -61,7 +61,9 @@ class TaintAnalysisService:
                 "count": 1
             }
         """
-        logger.info(f"Running taint analysis with rule: {rule.name} (project: {project_name or 'current'})")
+        logger.info(
+            f"Running taint analysis with rule: {rule.name} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性
@@ -229,7 +231,9 @@ class TaintAnalysisService:
                 "count": 1
             }
         """
-        logger.info(f"Checking taint flow: {source_pattern} -> {sink_pattern} (project: {project_name or 'current'})")
+        logger.info(
+            f"Checking taint flow: {source_pattern} -> {sink_pattern} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性

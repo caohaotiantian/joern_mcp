@@ -25,7 +25,7 @@ def _clean_dot_string(stdout: str) -> str:
 
     # 移除 Scala REPL 输出前缀（如 "val res0: String = "）
     if result.startswith("val "):
-        match = re.search(r'=\s*(.+)', result, re.DOTALL)
+        match = re.search(r"=\s*(.+)", result, re.DOTALL)
         if match:
             result = match.group(1).strip()
 
@@ -75,7 +75,9 @@ async def get_control_flow_graph(
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 
@@ -147,11 +149,15 @@ async def get_dominators(
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
-    logger.info(f"Getting control dependency graph for function: {function_name} (project: {project_name})")
+    logger.info(
+        f"Getting control dependency graph for function: {function_name} (project: {project_name})"
+    )
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 
@@ -202,9 +208,7 @@ async def get_dominators(
 
 
 @mcp.tool()
-async def analyze_control_structures(
-    project_name: str, function_name: str
-) -> dict:
+async def analyze_control_structures(project_name: str, function_name: str) -> dict:
     """
     分析函数中的控制结构
 
@@ -240,11 +244,15 @@ async def analyze_control_structures(
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
-    logger.info(f"Analyzing control structures in: {function_name} (project: {project_name})")
+    logger.info(
+        f"Analyzing control structures in: {function_name} (project: {project_name})"
+    )
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 

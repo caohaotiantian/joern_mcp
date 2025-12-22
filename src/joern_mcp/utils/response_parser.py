@@ -48,7 +48,7 @@ def _parse_scala_list(value: str) -> list:
         解析后的 Python 列表
     """
     # 匹配 List(...) 格式
-    list_match = re.match(r'List\s*\((.*)\)', value, re.DOTALL)
+    list_match = re.match(r"List\s*\((.*)\)", value, re.DOTALL)
     if not list_match:
         return []
 
@@ -62,7 +62,7 @@ def _parse_scala_list(value: str) -> list:
     string_pattern = r'"([^"\\]*(?:\\.[^"\\]*)*)"'
     for match in re.finditer(string_pattern, content):
         # 处理转义字符
-        item = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+        item = match.group(1).replace('\\"', '"').replace("\\n", "\n")
         items.append(item)
 
     return items
@@ -86,12 +86,15 @@ def _recursively_parse_json(data: Any, max_depth: int = 10) -> Any:
         data_stripped = data.strip()
 
         # 移除多余的首尾双引号（如 '""[...]""'）
-        while (data_stripped.startswith('""') and data_stripped.endswith('""')
-               and len(data_stripped) > 4):
+        while (
+            data_stripped.startswith('""')
+            and data_stripped.endswith('""')
+            and len(data_stripped) > 4
+        ):
             data_stripped = data_stripped[2:-2]
 
         # 处理转义的 JSON 字符串（如 \n, \", \\）
-        if '\\n' in data_stripped or '\\"' in data_stripped:
+        if "\\n" in data_stripped or '\\"' in data_stripped:
             # 尝试解码转义字符
             try:
                 # 先尝试作为 JSON 字符串解码
@@ -103,18 +106,23 @@ def _recursively_parse_json(data: Any, max_depth: int = 10) -> Any:
                 pass
 
         # 单层引号包裹
-        while (data_stripped.startswith('"') and data_stripped.endswith('"')
-               and len(data_stripped) > 2):
+        while (
+            data_stripped.startswith('"')
+            and data_stripped.endswith('"')
+            and len(data_stripped) > 2
+        ):
             inner = data_stripped[1:-1]
             # 检查内部是否像 JSON
-            if inner.startswith('[') or inner.startswith('{'):
+            if inner.startswith("[") or inner.startswith("{"):
                 data_stripped = inner
                 break
             else:
                 # 检查是否是转义的 JSON
                 try:
                     test_parse = json.loads(data_stripped)
-                    if isinstance(test_parse, str) and (test_parse.startswith('[') or test_parse.startswith('{')):
+                    if isinstance(test_parse, str) and (
+                        test_parse.startswith("[") or test_parse.startswith("{")
+                    ):
                         data_stripped = test_parse
                         continue
                 except json.JSONDecodeError:
@@ -165,8 +173,11 @@ def parse_joern_response(stdout: str) -> Any:
     clean_output = stdout.strip()
 
     # 预处理：移除多余的首尾双引号
-    while (clean_output.startswith('""') and clean_output.endswith('""')
-           and len(clean_output) > 4):
+    while (
+        clean_output.startswith('""')
+        and clean_output.endswith('""')
+        and len(clean_output) > 4
+    ):
         clean_output = clean_output[2:-2]
 
     # 尝试方法 1: 直接解析 JSON
@@ -179,7 +190,9 @@ def parse_joern_response(stdout: str) -> Any:
 
     # 尝试方法 2: 从 Scala REPL 输出提取值
     # 格式: `val res1: Type = ...`
-    repl_match = re.search(r'val\s+\w+:\s*[\w\[\]]+\s*=\s*(.+)', clean_output, re.DOTALL)
+    repl_match = re.search(
+        r"val\s+\w+:\s*[\w\[\]]+\s*=\s*(.+)", clean_output, re.DOTALL
+    )
     if repl_match:
         value_part = repl_match.group(1).strip()
 
@@ -191,7 +204,7 @@ def parse_joern_response(stdout: str) -> Any:
             pass
 
         # 2b: 尝试解析 Scala List 格式
-        if value_part.startswith('List('):
+        if value_part.startswith("List("):
             return _parse_scala_list(value_part)
 
         # 2c: 尝试解析为 Scala 字符串
@@ -199,7 +212,7 @@ def parse_joern_response(stdout: str) -> Any:
             return _parse_scala_string(value_part)
 
     # 尝试方法 3: 查找第一个 JSON 数组或对象
-    json_match = re.search(r'(\[.*\]|\{.*\})', clean_output, re.DOTALL)
+    json_match = re.search(r"(\[.*\]|\{.*\})", clean_output, re.DOTALL)
     if json_match:
         try:
             data = json.loads(json_match.group(1))
@@ -208,7 +221,7 @@ def parse_joern_response(stdout: str) -> Any:
             pass
 
     # 尝试方法 4: 检查是否是简单的等号赋值格式
-    simple_match = re.search(r'=\s*(.+)$', clean_output, re.MULTILINE)
+    simple_match = re.search(r"=\s*(.+)$", clean_output, re.MULTILINE)
     if simple_match:
         value = simple_match.group(1).strip()
         # 尝试解析为字符串
@@ -253,13 +266,12 @@ def extract_json_from_repl(stdout: str) -> str | None:
     clean_output = stdout.strip()
 
     # 如果本身就是 JSON，直接返回
-    if clean_output.startswith('[') or clean_output.startswith('{'):
+    if clean_output.startswith("[") or clean_output.startswith("{"):
         return clean_output
 
     # 从 Scala REPL 格式提取
-    match = re.search(r'=\s*(.+)$', clean_output, re.MULTILINE)
+    match = re.search(r"=\s*(.+)$", clean_output, re.MULTILINE)
     if match:
         return match.group(1).strip()
 
     return None
-

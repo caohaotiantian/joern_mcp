@@ -58,7 +58,9 @@ async def get_function_code(
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 
@@ -107,6 +109,7 @@ async def get_function_code(
                 elif isinstance(func, str):
                     # 尝试解析字符串为 JSON
                     import json
+
                     try:
                         parsed = json.loads(func)
                         if isinstance(parsed, dict):
@@ -163,11 +166,15 @@ async def list_functions(
     if not server_state.query_executor:
         return {"success": False, "error": "Query executor not initialized"}
 
-    logger.info(f"Listing functions (filter: {name_filter}, limit: {limit}, project: {project_name})")
+    logger.info(
+        f"Listing functions (filter: {name_filter}, limit: {limit}, project: {project_name})"
+    )
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 
@@ -218,9 +225,7 @@ async def list_functions(
 
 
 @mcp.tool()
-async def search_code(
-    project_name: str, pattern: str, scope: str = "all"
-) -> dict:
+async def search_code(project_name: str, pattern: str, scope: str = "all") -> dict:
     """
     搜索代码
 
@@ -261,46 +266,48 @@ async def search_code(
 
     try:
         # 安全获取 CPG 前缀，验证项目存在性
-        cpg_prefix, error = await get_safe_cpg_prefix(server_state.query_executor, project_name)
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
         if error:
             return {"success": False, "error": error}
 
         # 根据scope构建查询
         if scope == "methods":
             # 搜索方法名
-            query = f'''{cpg_prefix}.method.name(".*{pattern}.*").take(50).map(n => Map(
+            query = f"""{cpg_prefix}.method.name(".*{pattern}.*").take(50).map(n => Map(
                 "code" -> n.name,
                 "type" -> "METHOD",
                 "file" -> n.filename,
                 "line" -> n.lineNumber.getOrElse(-1)
-            ))'''
+            ))"""
         elif scope == "calls":
             # 搜索函数调用
-            query = f'''{cpg_prefix}.call.name(".*{pattern}.*").take(50).map(n => Map(
+            query = f"""{cpg_prefix}.call.name(".*{pattern}.*").take(50).map(n => Map(
                 "code" -> n.code,
                 "type" -> "CALL",
                 "file" -> n.file.name.headOption.getOrElse("unknown"),
                 "line" -> n.lineNumber.getOrElse(-1)
-            ))'''
+            ))"""
         elif scope == "identifiers":
             # 搜索标识符
-            query = f'''{cpg_prefix}.identifier.name(".*{pattern}.*").take(50).map(n => Map(
+            query = f"""{cpg_prefix}.identifier.name(".*{pattern}.*").take(50).map(n => Map(
                 "code" -> n.code,
                 "type" -> "IDENTIFIER",
                 "file" -> n.file.name.headOption.getOrElse("unknown"),
                 "line" -> n.lineNumber.getOrElse(-1)
-            ))'''
+            ))"""
         elif scope == "literals":
             # 搜索字面量
-            query = f'''{cpg_prefix}.literal.code(".*{pattern}.*").take(50).map(n => Map(
+            query = f"""{cpg_prefix}.literal.code(".*{pattern}.*").take(50).map(n => Map(
                 "code" -> n.code,
                 "type" -> "LITERAL",
                 "file" -> n.file.name.headOption.getOrElse("unknown"),
                 "line" -> n.lineNumber.getOrElse(-1)
-            ))'''
+            ))"""
         else:  # all - 搜索调用和标识符
             # 使用 call 和 identifier 的组合来搜索
-            query = f'''{cpg_prefix}.call.code(".*{pattern}.*").take(25).map(n => Map(
+            query = f"""{cpg_prefix}.call.code(".*{pattern}.*").take(25).map(n => Map(
                 "code" -> n.code,
                 "type" -> "CALL",
                 "file" -> n.file.name.headOption.getOrElse("unknown"),
@@ -310,7 +317,7 @@ async def search_code(
                 "type" -> "IDENTIFIER",
                 "file" -> n.file.name.headOption.getOrElse("unknown"),
                 "line" -> n.lineNumber.getOrElse(-1)
-            ))'''
+            ))"""
 
         # 执行查询
         result = await server_state.query_executor.execute(query)

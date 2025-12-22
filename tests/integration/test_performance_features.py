@@ -93,8 +93,9 @@ class TestPerformanceFeatures:
         assert current_limit > 0, "并发限制应该>0"
 
         # 限制应该在合理范围内（根据配置：min=3, max=20）
-        assert 3 <= current_limit <= 20, \
+        assert 3 <= current_limit <= 20, (
             f"并发限制应该在3-20之间，实际: {current_limit}"
+        )
 
     @pytest.mark.asyncio
     async def test_query_complexity_analysis(self, joern_server):
@@ -103,7 +104,9 @@ class TestPerformanceFeatures:
 
         # 测试不同复杂度的查询
         simple_query = "cpg.method.name.l"
-        complex_query = "cpg.method.where(_.name.matches('.*')).repeat(_.caller)(3).name.l"
+        complex_query = (
+            "cpg.method.where(_.name.matches('.*')).repeat(_.caller)(3).name.l"
+        )
 
         # 执行查询（内部会进行复杂度分析）
         await executor.execute(simple_query)
@@ -114,8 +117,9 @@ class TestPerformanceFeatures:
 
         # 验证统计包含必要信息
         assert "total_queries" in perf_stats, "应该有总查询数"
-        assert perf_stats["total_queries"] >= 2, \
+        assert perf_stats["total_queries"] >= 2, (
             f"应该至少有2个查询，实际: {perf_stats['total_queries']}"
+        )
 
     @pytest.mark.asyncio
     async def test_slow_query_detection(self, joern_server):
@@ -140,8 +144,7 @@ class TestPerformanceFeatures:
             assert "timestamp" in sq, "慢查询应该有timestamp字段"
 
             # 验证duration是数字且合理
-            assert isinstance(sq["duration"], (int, float)), \
-                "duration应该是数字"
+            assert isinstance(sq["duration"], (int, float)), "duration应该是数字"
             assert sq["duration"] > 0, "duration应该>0"
 
     @pytest.mark.asyncio
@@ -178,15 +181,19 @@ class TestPerformanceFeatures:
             assert field in perf_stats, f"性能统计应该包含{field}"
 
         # 验证值的合理性
-        assert perf_stats["total_queries"] >= 3, \
+        assert perf_stats["total_queries"] >= 3, (
             f"总查询数应该>=3，实际: {perf_stats['total_queries']}"
+        )
         # 注意：cache_hit_rate和success_rate是百分比（0-100），不是比率（0-1）
-        assert 0 <= perf_stats["cache_hit_rate"] <= 100, \
+        assert 0 <= perf_stats["cache_hit_rate"] <= 100, (
             f"缓存命中率应该在0-100之间，实际: {perf_stats['cache_hit_rate']}"
-        assert 0 <= perf_stats["success_rate"] <= 100, \
+        )
+        assert 0 <= perf_stats["success_rate"] <= 100, (
             f"成功率应该在0-100之间，实际: {perf_stats['success_rate']}"
-        assert perf_stats["avg_time"] >= 0, \
+        )
+        assert perf_stats["avg_time"] >= 0, (
             f"平均时间应该>=0，实际: {perf_stats['avg_time']}"
+        )
 
     @pytest.mark.asyncio
     async def test_cache_clear_functionality(self, joern_server):
@@ -208,8 +215,7 @@ class TestPerformanceFeatures:
         after_size = stats_after.get("total_size", 0)
 
         # 清理后缓存应该为空
-        assert after_size == 0, \
-            f"清理后缓存大小应该为0，实际: {after_size}"
+        assert after_size == 0, f"清理后缓存大小应该为0，实际: {after_size}"
 
     @pytest.mark.asyncio
     @pytest.mark.skip(
@@ -233,13 +239,13 @@ class TestPerformanceFeatures:
         perf_stats = executor.get_performance_stats()
 
         # 应该记录了所有查询
-        assert perf_stats["total_queries"] >= 5, \
+        assert perf_stats["total_queries"] >= 5, (
             f"应该记录至少5个查询，实际: {perf_stats['total_queries']}"
+        )
 
         # 成功率应该合理（百分比：0-100）
         success_rate = perf_stats.get("success_rate", 0)
-        assert 0 <= success_rate <= 100, \
-            f"成功率应该在0-100之间，实际: {success_rate}"
+        assert 0 <= success_rate <= 100, f"成功率应该在0-100之间，实际: {success_rate}"
 
     @pytest.mark.asyncio
     async def test_format_options(self, joern_server):
@@ -257,4 +263,3 @@ class TestPerformanceFeatures:
         # 两者都应该有结果
         assert result_json is not None
         assert result_dot is not None
-

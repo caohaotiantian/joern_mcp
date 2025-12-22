@@ -154,13 +154,13 @@ class QueryTemplates:
     GET_CFG = Template("""
         cpg.method.name("$name")
            .dotCfg
-           .l
+           .head
     """)
 
     GET_DOMINATORS = Template("""
         cpg.method.name("$name")
            .dotDom
-           .l
+           .head
     """)
 
     # ===== 漏洞检测 =====

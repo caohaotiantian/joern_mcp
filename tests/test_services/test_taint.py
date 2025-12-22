@@ -83,7 +83,9 @@ async def test_find_vulnerabilities():
     )
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.find_vulnerabilities(severity="CRITICAL", project_name="test")
+    result = await service.find_vulnerabilities(
+        severity="CRITICAL", project_name="test"
+    )
 
     assert result["success"] is True
     assert "vulnerabilities" in result
@@ -98,7 +100,9 @@ async def test_find_vulnerabilities_by_rule_name():
     mock_executor.execute = AsyncMock(return_value={"success": True, "stdout": "[]"})
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.find_vulnerabilities(rule_name="Command Injection", project_name="test")
+    result = await service.find_vulnerabilities(
+        rule_name="Command Injection", project_name="test"
+    )
 
     assert result["success"] is True
     assert result["rules_checked"] == 1
@@ -136,7 +140,9 @@ async def test_check_specific_flow_no_results():
     mock_executor.execute = AsyncMock(return_value={"success": True, "stdout": "[]"})
 
     service = TaintAnalysisService(mock_executor)
-    result = await service.check_specific_flow("safe_func", "safe_sink", project_name="test")
+    result = await service.check_specific_flow(
+        "safe_func", "safe_sink", project_name="test"
+    )
 
     assert result["success"] is True
     assert result["count"] == 0

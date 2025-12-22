@@ -20,7 +20,9 @@ from joern_mcp.services.taint import TaintAnalysisService  # noqa: E402
 from joern_mcp.utils.port_utils import find_free_port  # noqa: E402
 
 
-async def analyze_command_injection(source_path: str, project_name: str = "cmd_injection_scan"):
+async def analyze_command_injection(
+    source_path: str, project_name: str = "cmd_injection_scan"
+):
     """
     分析代码中的命令注入漏洞
 
@@ -110,6 +112,7 @@ async def analyze_command_injection(source_path: str, project_name: str = "cmd_i
     except Exception as e:
         print(f"\n❌ 发生错误: {e}")
         import traceback
+
         traceback.print_exc()
 
     finally:
@@ -137,9 +140,10 @@ def main():
         sys.exit(1)
 
     # 运行分析
-    asyncio.run(analyze_command_injection(str(Path(source_path).resolve()), project_name))
+    asyncio.run(
+        analyze_command_injection(str(Path(source_path).resolve()), project_name)
+    )
 
 
 if __name__ == "__main__":
     main()
-

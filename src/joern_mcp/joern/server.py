@@ -190,7 +190,9 @@ class JoernServerManager:
                     )
                     # 标记为外部管理的服务器（不由我们启动）
                     self._external_server = True
-                    logger.info(f"Connected to existing Joern server at {self.endpoint}")
+                    logger.info(
+                        f"Connected to existing Joern server at {self.endpoint}"
+                    )
                     return True
 
             logger.debug(f"Server at {self.endpoint} did not respond correctly")
@@ -303,16 +305,12 @@ class JoernServerManager:
             return
         try:
             stdout_data = (
-                await asyncio.wait_for(
-                    self.process.stdout.read(2048), timeout=0.5
-                )
+                await asyncio.wait_for(self.process.stdout.read(2048), timeout=0.5)
                 if self.process.stdout
                 else b""
             )
             stderr_data = (
-                await asyncio.wait_for(
-                    self.process.stderr.read(2048), timeout=0.5
-                )
+                await asyncio.wait_for(self.process.stderr.read(2048), timeout=0.5)
                 if self.process.stderr
                 else b""
             )

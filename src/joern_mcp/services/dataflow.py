@@ -59,7 +59,9 @@ class DataFlowService:
                 "count": 1
             }
         """
-        logger.info(f"Tracking dataflow from {source_method} to {sink_method} (project: {project_name or 'current'})")
+        logger.info(
+            f"Tracking dataflow from {source_method} to {sink_method} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性
@@ -158,7 +160,9 @@ class DataFlowService:
                 "count": 1
             }
         """
-        logger.info(f"Analyzing variable flow: {variable_name} (project: {project_name or 'current'})")
+        logger.info(
+            f"Analyzing variable flow: {variable_name} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性
@@ -265,7 +269,9 @@ class DataFlowService:
                 "count": 1
             }
         """
-        logger.info(f"Finding data dependencies in function: {function_name} (project: {project_name or 'current'})")
+        logger.info(
+            f"Finding data dependencies in function: {function_name} (project: {project_name or 'current'})"
+        )
 
         try:
             # 安全获取 CPG 前缀，验证项目存在性

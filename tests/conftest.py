@@ -21,9 +21,15 @@ def mock_project_validation():
     单元测试目录会自动使用此 fixture（见下方的 autouse fixture）。
     集成测试和 e2e 测试不会自动使用此 fixture。
     """
-    with patch("joern_mcp.services.callgraph.get_safe_cpg_prefix", mock_get_safe_cpg_prefix), \
-         patch("joern_mcp.services.dataflow.get_safe_cpg_prefix", mock_get_safe_cpg_prefix), \
-         patch("joern_mcp.services.taint.get_safe_cpg_prefix", mock_get_safe_cpg_prefix):
+    with (
+        patch(
+            "joern_mcp.services.callgraph.get_safe_cpg_prefix", mock_get_safe_cpg_prefix
+        ),
+        patch(
+            "joern_mcp.services.dataflow.get_safe_cpg_prefix", mock_get_safe_cpg_prefix
+        ),
+        patch("joern_mcp.services.taint.get_safe_cpg_prefix", mock_get_safe_cpg_prefix),
+    ):
         yield
 
 

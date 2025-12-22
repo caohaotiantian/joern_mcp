@@ -49,7 +49,9 @@ async def test_analyze_variable_flow():
     )
 
     service = DataFlowService(mock_executor)
-    result = await service.analyze_variable_flow("user_input", "system", project_name="test")
+    result = await service.analyze_variable_flow(
+        "user_input", "system", project_name="test"
+    )
 
     assert result["success"] is True
     assert result["variable"] == "user_input"

@@ -56,7 +56,7 @@ class TestHTTPClient:
             # 创建临时C代码文件
             with tempfile.TemporaryDirectory() as tmpdir:
                 code_file = Path(tmpdir) / "test.c"
-                code_file.write_text('int main() { return 0; }')
+                code_file.write_text("int main() { return 0; }")
 
                 # 导入代码
                 result = await server.import_code(str(tmpdir), "test-project")
