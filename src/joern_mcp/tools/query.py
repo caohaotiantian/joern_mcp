@@ -342,3 +342,105 @@ async def search_code(project_name: str, pattern: str, scope: str = "all") -> di
     except Exception as e:
         logger.exception(f"Error searching code: {e}")
         return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+async def execute_query(project_name: str, query: str) -> dict:
+    """
+    执行自定义 Joern 查询
+
+    此工具允许执行自定义的 Joern CPGQL 查询。查询会自动使用指定项目的 CPG。
+
+    Args:
+        project_name: 项目名称（必填，使用 list_projects 查看可用项目）
+        query: Joern 查询字符串（CPGQL 语法）
+
+    Returns:
+        dict: 查询结果，包含解析后的数据和原始输出
+
+    Example:
+        >>> await execute_query("webapp", "cpg.method.name(\"main\").size")
+        {
+            "success": true,
+            "project": "webapp",
+            "result": 1,
+            "raw_output": "1"
+        }
+
+        >>> await execute_query("webapp", "cpg.method.name(\"main\").map(m => Map(\"name\" -> m.name, \"signature\" -> m.signature))")
+        {
+            "success": true,
+            "project": "webapp",
+            "result": [{"name": "main", "signature": "int(int,char**)"}],
+            "raw_output": "[{\"name\":\"main\",\"signature\":\"int(int,char**)\"}]"
+        }
+
+    Note:
+        - 查询中的 `cpg.` 会自动替换为项目特定的 CPG 前缀
+        - 如果查询中已经包含项目前缀（如 `workspace.project(...)`），则不会替换
+        - 查询结果会自动解析为 JSON 格式（如果可能）
+        - 如果解析失败，会返回原始字符串输出
+    """
+    if not server_state.query_executor:
+        return {"success": False, "error": "Query executor not initialized"}
+
+    logger.info(f"Executing custom query in project: {project_name}")
+    logger.debug(f"Query: {query}")
+
+    try:
+        # 安全获取 CPG 前缀，验证项目存在性
+        cpg_prefix, error = await get_safe_cpg_prefix(
+            server_state.query_executor, project_name
+        )
+        if error:
+            return {"success": False, "error": error}
+
+        # 处理查询字符串：将 cpg. 替换为项目特定的前缀
+        # 但保留已经包含 workspace.project 的查询不变
+        processed_query = query
+        if "workspace.project" not in query:
+            if "cpg." in query:
+                # 替换 cpg. 为项目特定的前缀
+                processed_query = query.replace("cpg.", f"{cpg_prefix}.")
+            elif query.strip().startswith(
+                ("method", "call", "identifier", "literal", "file")
+            ):
+                # 如果查询看起来像是一个完整的 CPG 查询，添加前缀
+                processed_query = f"{cpg_prefix}.{query.strip()}"
+            # 否则，直接使用原始查询（可能是 workspace 查询或其他）
+
+        logger.debug(f"Processed query: {processed_query}")
+
+        # 执行查询
+        result = await server_state.query_executor.execute(processed_query)
+
+        if result.get("success"):
+            stdout = result.get("stdout", "")
+            raw_output = stdout
+
+            # 尝试解析结果为 JSON
+            try:
+                parsed_result = safe_parse_joern_response(stdout, default=None)
+                return {
+                    "success": True,
+                    "project": project_name,
+                    "result": parsed_result,
+                    "raw_output": raw_output,
+                }
+            except Exception as parse_error:
+                # 解析失败，返回原始输出
+                logger.debug(f"Failed to parse query result as JSON: {parse_error}")
+                return {
+                    "success": True,
+                    "project": project_name,
+                    "result": stdout,
+                    "raw_output": raw_output,
+                }
+        else:
+            stderr = result.get("stderr", "Query failed")
+            logger.error(f"Query execution failed: {stderr}")
+            return {"success": False, "error": stderr}
+
+    except Exception as e:
+        logger.exception(f"Error executing query: {e}")
+        return {"success": False, "error": str(e)}
