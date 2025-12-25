@@ -396,18 +396,7 @@ async def execute_query(project_name: str, query: str) -> dict:
             return {"success": False, "error": error}
 
         # 处理查询字符串：将 cpg. 替换为项目特定的前缀
-        # 但保留已经包含 workspace.project 的查询不变
-        processed_query = query
-        if "workspace.project" not in query:
-            if "cpg." in query:
-                # 替换 cpg. 为项目特定的前缀
-                processed_query = query.replace("cpg.", f"{cpg_prefix}.")
-            elif query.strip().startswith(
-                ("method", "call", "identifier", "literal", "file")
-            ):
-                # 如果查询看起来像是一个完整的 CPG 查询，添加前缀
-                processed_query = f"{cpg_prefix}.{query.strip()}"
-            # 否则，直接使用原始查询（可能是 workspace 查询或其他）
+        processed_query = query.replace("cpg.", f"{cpg_prefix}.")
 
         logger.debug(f"Processed query: {processed_query}")
 
